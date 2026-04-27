@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "autoMode": {
+    "environment": [
+      "Project: private Telegram-controlled AI video generation platform",
+      "Trusted source control: add your Git remote organizations here",
+      "Trusted cloud buckets: add your Cloudflare R2 bucket names or prefixes here",
+      "Trusted internal domains: add your API, webhook, or dashboard domains here",
+      "Key internal services: add Cloudflare, Vast.ai, monitoring, and CI endpoints you trust"
+    ]
+  }
+}

@@ -1,0 +1,101 @@
+name = "video-platform"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+account_id = "95db7e4a7e28c95dfabfc52650591059"
+
+# ── D1 Database ───────────────────────────────────────────────────────────────
+[[d1_databases]]
+binding = "DB"
+database_name = "video-platform-db"
+database_id = "d7480601-e990-4d92-9341-f968a1079e60"
+migrations_dir = "src/db/migrations"
+
+# ── R2 Buckets ────────────────────────────────────────────────────────────────
+# Default admin bucket for system use.
+# Operator-created runtime buckets are accessed via the R2 REST API using
+# R2_ACCOUNT_TOKEN secret — wrangler bindings cannot be added at runtime.
+[[r2_buckets]]
+binding = "R2_ADMIN"
+bucket_name = "video-platform-admin"
+
+# ── Queues (producers) ────────────────────────────────────────────────────────
+[[queues.producers]]
+binding = "RENDER_QUEUE"
+queue = "render-queue"
+
+[[queues.producers]]
+binding = "PUBLISH_QUEUE"
+queue = "publish-queue"
+
+[[queues.producers]]
+binding = "STREAM_QUEUE"
+queue = "stream-queue"
+
+# ── Queues (consumers) ────────────────────────────────────────────────────────
+[[queues.consumers]]
+queue = "stream-queue"
+max_batch_size = 1
+max_batch_timeout = 5
+max_retries = 5          # increased from 2: Gemini timeouts shouldn't silently drop batches
+dead_letter_queue = "render-dlq"
+
+[[queues.consumers]]
+queue = "render-queue"
+max_batch_size = 5
+max_batch_timeout = 10
+max_retries = 3
+dead_letter_queue = "render-dlq"
+
+[[queues.consumers]]
+queue = "publish-queue"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "publish-dlq"
+
+# ── Environment variables (non-secret) ───────────────────────────────────────
+[vars]
+ENVIRONMENT = "production"
+LOG_LEVEL = "info"
+# Webhook paths are non-secret; security comes from HMAC signature verification
+CONTROL_BOT_WEBHOOK_PATH = "/webhook/control"
+PUBLISHER_BOT_WEBHOOK_PATH = "/webhook/publisher"
+VAST_API_BASE_URL = "https://console.vast.ai/api/v0"
+GEMINI_MODEL = "gemini-2.5-flash"
+# CF Workers Free plan: 50 subrequests per invocation. Single Gemini call per prompt
+# → 44 prompts × 1 call + 4 Vast calls (batch 0) = 48 subrequests ✓ (under 50 limit).
+PROMPT_BATCH_SIZE = "44"
+DIVERSITY_MODE = "soft"
+CONTROL_PLANE_URL = "https://video-platform.video-platform-m0559195631.workers.dev"
+
+# ── Secrets (set via `wrangler secret put <NAME>`) ───────────────────────────
+# Never add values here. These names are listed for documentation only:
+#
+# CONTROL_BOT_TOKEN        — Telegram bot token for the control bot
+# PUBLISHER_BOT_TOKEN      — Telegram bot token for the publisher bot
+# CONTROL_BOT_SECRET       — Telegram webhook secret_token for control bot HMAC
+# PUBLISHER_BOT_SECRET     — Telegram webhook secret_token for publisher bot HMAC
+# VAST_API_KEY             — Vast.ai account API key
+# R2_ACCOUNT_TOKEN         — CF API token scoped to R2 for runtime bucket ops
+# R2_ACCOUNT_ID            — Cloudflare account ID (needed for R2 REST API)
+# ACCESS_PASSWORD_HASH     — bcrypt-compatible hash of the operator access password
+# TELEGRAM_CHANNEL_ID      — Telegram channel ID where the publisher bot posts videos
+# GEMINI_API_KEY           — Google Gemini API key for prompt generation
+# HF_TOKEN                 — HuggingFace access token for gated models (Gemma-3 text encoder)
+
+# ── Cron triggers ────────────────────────────────────────────────────────────
+[triggers]
+crons = ["*/15 * * * *"]   # Reaper runs every 15 minutes
+
+# ── Module rules ─────────────────────────────────────────────────────────────
+# Allow importing shell scripts and Python files as plain text strings.
+# These are bundled at build time and served as static HTTP responses.
+[[rules]]
+type = "Text"
+globs = ["**/*.sh", "**/*.py"]
+
+# ── Local development ─────────────────────────────────────────────────────────
+[dev]
+port = 8787
+local_protocol = "http"

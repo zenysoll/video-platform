@@ -1,0 +1,20 @@
+CLAUDE.local.md
+.claude/settings.local.json
+!.claude/settings.local.example.json
+!CLAUDE.local.example.md
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Cloudflare local state
+.wrangler/
+
+# Local dev secrets (never commit)
+.dev.vars
+
+# macOS
+.DS_Store
+

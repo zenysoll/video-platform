@@ -1,0 +1,22 @@
+{
+  "name": "video-platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 migrations apply video-platform-db --remote",
+    "db:migrate:local": "wrangler d1 migrations apply video-platform-db --local",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4",
+    "@typescript-eslint/eslint-plugin": "^7",
+    "@typescript-eslint/parser": "^7",
+    "eslint": "^8",
+    "typescript": "^5",
+    "wrangler": "^4.82.2"
+  }
+}

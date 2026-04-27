@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tma",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-C", "/Users/newzeland/Desktop/radar", "dev:tma"],
+      "port": 5173
+    },
+    {
+      "name": "crm",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-C", "/Users/newzeland/Desktop/radar", "dev:crm"],
+      "port": 3002
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-C", "/Users/newzeland/Desktop/radar", "dev:api"],
+      "port": 3001
+    }
+  ]
+}

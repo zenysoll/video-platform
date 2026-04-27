@@ -1,0 +1,1137 @@
+<mxfile host="app.diagrams.net" agent="Claude" pages="7">
+  <diagram name="1. Как это работает" id="ZlhtrzlosAAAY4eh1LWx">
+    <mxGraphModel dx="1426" dy="974" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="1">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="p1t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#1a1a2e;" value="Как работает платформа автогенерации видео" vertex="1">
+          <mxGeometry height="46" width="1500" x="77" y="15" as="geometry" />
+        </mxCell>
+        <mxCell id="p1s" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#555555;" value="Оператор настраивает стрим через Telegram — система арендует GPU, генерирует уникальные видео и публикует в канал без ручного труда." vertex="1">
+          <mxGeometry height="28" width="1500" x="77" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p1b1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#93c5fd;fontSize=13;arcSize=3;verticalAlign=top;fontStyle=1;fontColor=#1e40af;" value="👤  ОПЕРАТОР" vertex="1">
+          <mxGeometry height="200" width="1574" x="40" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="p1b2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3f4f6;strokeColor=#d1d5db;fontSize=13;arcSize=3;verticalAlign=top;fontStyle=1;fontColor=#374151;" value="☁️  CLOUDFLARE  (работает 24/7)" vertex="1">
+          <mxGeometry height="235" width="1574" x="40" y="323" as="geometry" />
+        </mxCell>
+        <mxCell id="p1b3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#fbbf24;fontSize=13;arcSize=3;verticalAlign=top;fontStyle=1;fontColor=#92400e;" value="🖥️  GPU-ВОРКЕР  Vast.ai RTX 5090  (платим только за часы активной генерации)" vertex="1">
+          <mxGeometry height="235" width="1574" x="40" y="576" as="geometry" />
+        </mxCell>
+        <mxCell id="p1b4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d1fae5;strokeColor=#6ee7b7;fontSize=13;arcSize=3;verticalAlign=top;fontStyle=1;fontColor=#065f46;" value="📣  TELEGRAM-КАНАЛ  (аудитория)" vertex="1">
+          <mxGeometry height="160" width="1574" x="40" y="829" as="geometry" />
+        </mxCell>
+        <mxCell id="p1o1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=10;" value="&lt;b&gt;1. Открывает бот&lt;/b&gt;&lt;br/&gt;Вводит пароль&lt;br/&gt;(одноразовый доступ)" vertex="1">
+          <mxGeometry height="115" width="195" x="80" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p1o2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=10;" value="&lt;b&gt;2. Настраивает стрим&lt;/b&gt;&lt;br/&gt;• Сколько видео (1–∞)&lt;br/&gt;• Формат 9:16 / 16:9 / 1:1&lt;br/&gt;• FPS, длина, звук&lt;br/&gt;• Bucket" vertex="1">
+          <mxGeometry height="140" width="205" x="325" y="135" as="geometry" />
+        </mxCell>
+        <mxCell id="p1o3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=10;" value="&lt;b&gt;3. Нажимает&lt;/b&gt;&lt;br/&gt;&lt;b&gt;«Запустить»&lt;/b&gt;&lt;br/&gt;Стрим уходит&lt;br/&gt;в очередь" vertex="1">
+          <mxGeometry height="115" width="185" x="585" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p1o4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=10;" value="&lt;b&gt;4. Получает&lt;/b&gt;&lt;br/&gt;&lt;b&gt;уведомления&lt;/b&gt;&lt;br/&gt;Прогресс, ошибки,&lt;br/&gt;завершение" vertex="1">
+          <mxGeometry height="115" width="195" x="840" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p1o5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=10;" value="&lt;b&gt;5. Видит видео&lt;/b&gt;&lt;br/&gt;&lt;b&gt;в канале&lt;/b&gt;&lt;br/&gt;Готово — ни одной&lt;br/&gt;ручной операции" vertex="1">
+          <mxGeometry height="115" width="200" x="1110" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p1oe1" edge="1" parent="1" source="p1o1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p1o2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1oe2" edge="1" parent="1" source="p1o2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p1o3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1oe3" edge="1" parent="1" source="p1o3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p1o4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1oe4" edge="1" parent="1" source="p1o4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p1o5" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1c1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9fafb;strokeColor=#6b7280;fontSize=11;arcSize=10;" value="&lt;b&gt;Генерирует промпты&lt;/b&gt;&lt;br/&gt;Gemini AI&lt;br/&gt;Антидупликация&lt;br/&gt;(fingerprint)" vertex="1">
+          <mxGeometry height="115" width="195" x="80" y="365" as="geometry" />
+        </mxCell>
+        <mxCell id="p1c2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9fafb;strokeColor=#6b7280;fontSize=11;arcSize=10;" value="&lt;b&gt;Арендует GPU&lt;/b&gt;&lt;br/&gt;RTX 5090 на Vast.ai&lt;br/&gt;Только на время работы&lt;br/&gt;Фильтр VRAM/RAM/disk" vertex="1">
+          <mxGeometry height="120" width="200" x="330" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="p1c3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9fafb;strokeColor=#6b7280;fontSize=11;arcSize=10;" value="&lt;b&gt;Следит за состоянием&lt;/b&gt;&lt;br/&gt;Reaper каждые 15 мин&lt;br/&gt;Восстанавливает сбои&lt;br/&gt;4 типа sweep" vertex="1">
+          <mxGeometry height="115" width="200" x="590" y="365" as="geometry" />
+        </mxCell>
+        <mxCell id="p1c4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9fafb;strokeColor=#6b7280;fontSize=11;arcSize=10;" value="&lt;b&gt;Принимает видео&lt;/b&gt;&lt;br/&gt;Сохраняет в R2&lt;br/&gt;(Cloudflare Object&lt;br/&gt;Storage)" vertex="1">
+          <mxGeometry height="115" width="195" x="855" y="365" as="geometry" />
+        </mxCell>
+        <mxCell id="p1c5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9fafb;strokeColor=#6b7280;fontSize=11;arcSize=10;" value="&lt;b&gt;Publisher-бот&lt;/b&gt;&lt;br/&gt;публикует видео&lt;br/&gt;+ промпт в канал&lt;br/&gt;Уничтожает GPU" vertex="1">
+          <mxGeometry height="115" width="200" x="1115" y="365" as="geometry" />
+        </mxCell>
+        <mxCell id="p1ce1" edge="1" parent="1" source="p1c1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p1c2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1ce2" edge="1" parent="1" source="p1c2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p1c3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1ce3" edge="1" parent="1" source="p1c3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p1c4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1ce4" edge="1" parent="1" source="p1c4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p1c5" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1g1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;Cold Start ~25-30 мин&lt;/b&gt;&lt;br/&gt;Docker pull + bootstrap.sh&lt;br/&gt;ComfyUI + LTXVideo ноды&lt;br/&gt;PyTorch nightly cu128" vertex="1">
+          <mxGeometry height="135" width="215" x="80" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="p1g2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;Загружает модель в VRAM&lt;/b&gt;&lt;br/&gt;46 ГБ LTX-2.3 из R2&lt;br/&gt;~500 MB/s (~1.5 мин)&lt;br/&gt;wait_for_comfyui() ждёт" vertex="1">
+          <mxGeometry height="135" width="210" x="348" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="p1g3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;Клеймит задания&lt;/b&gt;&lt;br/&gt;GET /worker/jobs/claim&lt;br/&gt;Промпт + параметры&lt;br/&gt;от Control Plane" vertex="1">
+          <mxGeometry height="135" width="200" x="615" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="p1g4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;Генерирует видео&lt;/b&gt;&lt;br/&gt;ComfyUI /prompt API&lt;br/&gt;~2-5 мин на видео&lt;br/&gt;RTX 5090, 32 ГБ VRAM" vertex="1">
+          <mxGeometry height="135" width="200" x="874" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="p1g5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;Upload + /done&lt;/b&gt;&lt;br/&gt;Видео → R2&lt;br/&gt;Инстанс уничтожается&lt;br/&gt;Расходы прекращаются" vertex="1">
+          <mxGeometry height="135" width="200" x="1134" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="p1ge1" edge="1" parent="1" source="p1g1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p1g2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1ge2" edge="1" parent="1" source="p1g2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p1g3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1ge3" edge="1" parent="1" source="p1g3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p1g4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1ge4" edge="1" parent="1" source="p1g4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p1g5" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1ch" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#22c55e;fontSize=11;arcSize=10;" value="&lt;b&gt;Уникальные видео публикуются в Telegram-канал&lt;/b&gt;&lt;br/&gt;Каждое видео — отдельный промпт, нет повторов ни внутри стрима, ни между стримами.&lt;br/&gt;Оператор не нажал ни одной кнопки для каждого видео — всё автоматически." vertex="1">
+          <mxGeometry height="85" width="890" x="385" y="870" as="geometry" />
+        </mxCell>
+        <mxCell id="p1xv1" edge="1" parent="1" source="p1o3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#3b82f6;" target="p1c1" value="запрос">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="678" y="290" />
+              <mxPoint x="178" y="290" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1xv2" edge="1" parent="1" source="p1c2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#3b82f6;" target="p1g1" value="аренда GPU">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="430" y="530" />
+              <mxPoint x="187" y="530" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1xv3" edge="1" parent="1" source="p1g5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#3b82f6;" target="p1c4" value="видео+/done">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1150" y="520" />
+              <mxPoint x="952" y="520" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1xv4" edge="1" parent="1" source="p1c5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#22c55e;fontColor=#22c55e;" target="p1ch" value="публикация">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1560" y="423" />
+              <mxPoint x="1560" y="790" />
+              <mxPoint x="1030" y="790" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1xv5" edge="1" parent="1" source="p1c5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#9ca3af;" target="p1o4" value="уведомление">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1215" y="310" />
+              <mxPoint x="937" y="310" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1cost" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefce8;strokeColor=#ca8a04;fontSize=11;arcSize=6;" value="💰 &lt;b&gt;Стоимость&lt;/b&gt;&lt;br&gt;CF Workers: бесплатный tier, потом &amp;gt;$2&lt;br&gt;Vast.ai: ~$0.2–0.5/час (только во время генерации)&lt;br&gt;R2: $0.015/ГБ/мес&lt;br&gt;Нет idle-оплаты" vertex="1">
+          <mxGeometry height="130" width="218" x="1360" y="847.5" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="2. Архитектура системы" id="OgVnfvRREQJzfDwlZVVo">
+    <mxGraphModel grid="1" page="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="1">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="p2t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#1a1a2e;" value="Техническая архитектура системы" vertex="1">
+          <mxGeometry height="46" width="1500" x="77" y="15" as="geometry" />
+        </mxCell>
+        <mxCell id="p2s" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#555555;" value="Синий = Cloudflare Edge. Зелёный = Telegram. Оранжевый = Vast.ai GPU. Фиолетовый = Очереди. Жёлтый = Хранилище." vertex="1">
+          <mxGeometry height="28" width="1500" x="77" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p2tl" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#86efac;fontSize=14;fontStyle=1;fontColor=#166534;verticalAlign=top;arcSize=3;" value="TELEGRAM LAYER" vertex="1">
+          <mxGeometry height="170" width="1574" x="40" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="p2tu" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#22c55e;fontSize=11;arcSize=10;" value="&lt;b&gt;Оператор&lt;/b&gt;&lt;br/&gt;Telegram-клиент" vertex="1">
+          <mxGeometry height="97" width="155" x="80" y="148" as="geometry" />
+        </mxCell>
+        <mxCell id="p2tc" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#22c55e;fontSize=11;arcSize=10;" value="&lt;b&gt;Control Bot&lt;/b&gt;&lt;br/&gt;Команды / UX-кнопки&lt;br/&gt;Password gate&lt;br/&gt;Управление стримами" vertex="1">
+          <mxGeometry height="112" width="190" x="295" y="143" as="geometry" />
+        </mxCell>
+        <mxCell id="p2tp" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#22c55e;fontSize=11;arcSize=10;" value="&lt;b&gt;Publisher Bot&lt;/b&gt;&lt;br/&gt;Только публикует&lt;br/&gt;в канал (отдельный&lt;br/&gt;от control-бота)" vertex="1">
+          <mxGeometry height="112" width="180" x="548" y="143" as="geometry" />
+        </mxCell>
+        <mxCell id="p2tch" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#22c55e;fontSize=11;arcSize=10;" value="&lt;b&gt;Telegram Канал&lt;/b&gt;&lt;br/&gt;Принимает видео&lt;br/&gt;+ промпт-текст" vertex="1">
+          <mxGeometry height="107" width="170" x="793" y="148" as="geometry" />
+        </mxCell>
+        <mxCell id="p2ta" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#22c55e;fontSize=11;arcSize=10;" value="&lt;b&gt;Telegram Bot API&lt;/b&gt;&lt;br/&gt;Webhook → CF Worker&lt;br/&gt;Bot updates" vertex="1">
+          <mxGeometry height="107" width="185" x="1040" y="148" as="geometry" />
+        </mxCell>
+        <mxCell id="p2te1" edge="1" parent="1" source="p2tu" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p2tc" value="команды">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2te2" edge="1" parent="1" source="p2tc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p2ta" value="webhook">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="390" y="120" />
+              <mxPoint x="740" y="120" />
+              <mxPoint x="740" y="140" />
+              <mxPoint x="1133" y="140" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2te3" edge="1" parent="1" source="p2tp" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p2tch" value="post video">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2cl" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#93c5fd;fontSize=14;fontStyle=1;fontColor=#1e3a8a;verticalAlign=top;arcSize=3;" value="CLOUDFLARE EDGE — CONTROL PLANE (24/7, serverless)" vertex="1">
+          <mxGeometry height="445" width="1574" x="40" y="295" as="geometry" />
+        </mxCell>
+        <mxCell id="p2w1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=10;" value="&lt;b&gt;Telegram Handler&lt;/b&gt;&lt;br/&gt;src/telegram/&lt;br/&gt;• Роутинг обновлений&lt;br/&gt;• UX кнопки / меню&lt;br/&gt;• Парсинг настроек" vertex="1">
+          <mxGeometry height="135" width="175" x="65" y="345" as="geometry" />
+        </mxCell>
+        <mxCell id="p2w2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=10;" value="&lt;b&gt;Stream Consumer&lt;/b&gt;&lt;br/&gt;src/queues/stream-consumer.ts&lt;br/&gt;• Gemini: генерит промпты&lt;br/&gt;• Fingerprint-дедупликация&lt;br/&gt;• Создаёт job-записи в D1&lt;br/&gt;• Арендует GPU Vast.ai&lt;br/&gt;  batch_size=1, retry=2" vertex="1">
+          <mxGeometry height="165" width="210" x="295" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="p2w3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=10;" value="&lt;b&gt;Render Consumer&lt;/b&gt;&lt;br/&gt;src/queues/render-consumer.ts&lt;br/&gt;• Оркестрирует рендер&lt;br/&gt;• Резервирует слоты" vertex="1">
+          <mxGeometry height="130" width="195" x="565" y="345" as="geometry" />
+        </mxCell>
+        <mxCell id="p2w4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=10;" value="&lt;b&gt;Publish Consumer&lt;/b&gt;&lt;br/&gt;src/queues/publish-consumer.ts&lt;br/&gt;• Читает видео из R2&lt;br/&gt;• Публикует через Publisher Bot" vertex="1">
+          <mxGeometry height="110" width="195" x="565" y="515" as="geometry" />
+        </mxCell>
+        <mxCell id="p2w5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=10;" value="&lt;b&gt;Worker API&lt;/b&gt;&lt;br/&gt;src/worker-api/routes.ts&lt;br/&gt;GET  /jobs/claim&lt;br/&gt;POST /jobs/:id/complete&lt;br/&gt;POST /jobs/:id/fail&lt;br/&gt;POST /videos/:id&lt;br/&gt;POST /streams/:id/done" vertex="1">
+          <mxGeometry height="170" width="200" x="820" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="p2w6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=10;" value="&lt;b&gt;Scheduled Reaper&lt;/b&gt;&lt;br/&gt;src/cron/reaper.ts&lt;br/&gt;Каждые 15 мин:&lt;br/&gt;• Stuck rendering jobs&lt;br/&gt;• Orphaned instances&lt;br/&gt;• Stuck provisioning&lt;br/&gt;• Ghost streams (&gt;6ч)" vertex="1">
+          <mxGeometry height="170" width="200" x="1085" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="p2d1" parent="1" style="shape=mxgraph.flowchart.database;whiteSpace=wrap;html=1;fillColor=#d1fae5;strokeColor=#22c55e;fontSize=11;" value="&lt;b&gt;D1 SQLite&lt;/b&gt;&lt;br/&gt;video-platform-db&lt;br/&gt;• users&lt;br/&gt;• streams (state)&lt;br/&gt;• jobs (state)&lt;br/&gt;• buckets&lt;br/&gt;• prompt_fingerprints" vertex="1">
+          <mxGeometry height="190" width="175" x="65" y="515" as="geometry" />
+        </mxCell>
+        <mxCell id="p2q1" parent="1" style="shape=mxgraph.flowchart.multi-document;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#8b5cf6;fontSize=11;" value="&lt;b&gt;stream-queue&lt;/b&gt;&lt;br/&gt;batch_size=1&lt;br/&gt;max_retries=2" vertex="1">
+          <mxGeometry height="100" width="160" x="295" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="p2q2" parent="1" style="shape=mxgraph.flowchart.multi-document;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#8b5cf6;fontSize=11;" value="&lt;b&gt;render-queue&lt;/b&gt;&lt;br/&gt;per-job messages" vertex="1">
+          <mxGeometry height="80" width="160" x="295" y="645" as="geometry" />
+        </mxCell>
+        <mxCell id="p2q3" parent="1" style="shape=mxgraph.flowchart.multi-document;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#8b5cf6;fontSize=11;" value="&lt;b&gt;publish-queue&lt;/b&gt;&lt;br/&gt;после рендера" vertex="1">
+          <mxGeometry height="75" width="160" x="565" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="p2r2" parent="1" style="shape=mxgraph.flowchart.database;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#f59e0b;fontSize=11;" value="&lt;b&gt;Cloudflare R2&lt;/b&gt;&lt;br/&gt;Объектное хранилище&lt;br/&gt;• Видео от GPU&lt;br/&gt;• Модели (46 ГБ)&lt;br/&gt;$0.015/ГБ/мес" vertex="1">
+          <mxGeometry height="165" width="185" x="1355" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="p2ce1" edge="1" parent="1" source="p2w1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p2q1" value="enqueue">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="153" y="320" />
+              <mxPoint x="270" y="320" />
+              <mxPoint x="270" y="570" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2ce2" edge="1" parent="1" source="p2q1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p2w2" value="consume">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2ce3" edge="1" parent="1" source="p2w2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p2q2" value="enqueue">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="480" y="620" />
+              <mxPoint x="470" y="620" />
+              <mxPoint x="470" y="685" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2ce4" edge="1" parent="1" source="p2q2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p2w3" value="consume">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="540" y="685" />
+              <mxPoint x="540" y="410" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2ce5" edge="1" parent="1" source="p2w3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p2q3" value="enqueue">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="663" y="510" />
+              <mxPoint x="470" y="510" />
+              <mxPoint x="470" y="688" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2ce6" edge="1" parent="1" source="p2q3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p2w4" value="consume">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2ce7" edge="1" parent="1" source="p2w2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#9ca3af;" target="p2d1" value="CRUD">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="400" y="320" />
+              <mxPoint x="153" y="320" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2ce8" edge="1" parent="1" source="p2w5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#9ca3af;" target="p2d1" value="state">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="920" y="310" />
+              <mxPoint x="153" y="310" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2ce9" edge="1" parent="1" source="p2w6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#9ca3af;" target="p2d1" value="sweep">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="153" y="500" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2ce10" edge="1" parent="1" source="p2w4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#9ca3af;" target="p2r2" value="read">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2ce11" edge="1" parent="1" source="p2w5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p2r2" value="write">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="920" y="520" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2xe1" edge="1" parent="1" source="p2ta" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#3b82f6;" target="p2w1" value="Telegram update">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1133" y="280" />
+              <mxPoint x="153" y="280" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2xe2" edge="1" parent="1" source="p2w4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#22c55e;fontColor=#22c55e;" target="p2tp" value="publish video">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="550" y="570" />
+              <mxPoint x="550" y="385" />
+              <mxPoint x="520" y="385" />
+              <mxPoint x="520" y="199" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2el" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f3ff;strokeColor=#c4b5fd;fontSize=14;fontStyle=1;fontColor=#5b21b6;verticalAlign=top;arcSize=3;" value="EXTERNAL APIs" vertex="1">
+          <mxGeometry height="155" width="580" x="40" y="760" as="geometry" />
+        </mxCell>
+        <mxCell id="p2gem" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#faf5ff;strokeColor=#a855f7;fontSize=11;arcSize=10;" value="&lt;b&gt;Google Gemini API&lt;/b&gt;&lt;br/&gt;Генерация уникальных промптов&lt;br/&gt;Вызывается из Stream Consumer" vertex="1">
+          <mxGeometry height="95" width="245" x="70" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="p2hf" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#faf5ff;strokeColor=#a855f7;fontSize=11;arcSize=10;" value="&lt;b&gt;HuggingFace&lt;/b&gt;&lt;br/&gt;Fallback для загрузки модели&lt;br/&gt;~11 MB/s (vs 500 MB/s R2)" vertex="1">
+          <mxGeometry height="95" width="225" x="355" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="p2xe3" edge="1" parent="1" source="p2w2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#8b5cf6;fontColor=#8b5cf6;" target="p2gem" value="gen prompts">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="490" y="630" />
+              <mxPoint x="260" y="630" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2vl" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#f59e0b;fontSize=14;fontStyle=1;fontColor=#92400e;verticalAlign=top;arcSize=3;" value="VAST.AI GPU WORKER (платим только за время работы)" vertex="1">
+          <mxGeometry height="280" width="954" x="660" y="760" as="geometry" />
+        </mxCell>
+        <mxCell id="p2vi" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;Vast.ai Инстанс&lt;/b&gt;&lt;br/&gt;RTX 5090 (32 ГБ VRAM)&lt;br/&gt;RAM ≥ 48 ГБ&lt;br/&gt;Disk ≥ 120 ГБ&lt;br/&gt;Inet ≥ 500 Mbps&lt;br/&gt;Reliability ≥ 0.98" vertex="1">
+          <mxGeometry height="165" width="195" x="680" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="p2bs" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;bootstrap.sh&lt;/b&gt;&lt;br/&gt;apt / pip / ComfyUI&lt;br/&gt;PyTorch nightly cu128&lt;br/&gt;Модели из R2" vertex="1">
+          <mxGeometry height="120" width="185" x="920" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="p2cf2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;ComfyUI :8188&lt;/b&gt;&lt;br/&gt;POST /prompt&lt;br/&gt;GET /queue&lt;br/&gt;Workflow-рендер" vertex="1">
+          <mxGeometry height="82" width="185" x="920" y="945" as="geometry" />
+        </mxCell>
+        <mxCell id="p2ltx" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;LTX-Video 2.3&lt;/b&gt;&lt;br/&gt;22B параметров&lt;br/&gt;46 ГБ / 30 ГБ VRAM&lt;br/&gt;ComfyUI-LTXVideo node" vertex="1">
+          <mxGeometry height="120" width="200" x="1155" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="p2wpy" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;worker.py&lt;/b&gt;&lt;br/&gt;wait_for_comfyui()&lt;br/&gt;Polling 10с / idle 10м&lt;br/&gt;/claim→/complete→/fail" vertex="1">
+          <mxGeometry height="82" width="200" x="1155" y="945" as="geometry" />
+        </mxCell>
+        <mxCell id="p2ve1" edge="1" parent="1" source="p2bs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p2cf2" value="starts">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2ve2" edge="1" parent="1" source="p2bs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p2wpy" value="starts">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1090" y="930" />
+              <mxPoint x="1255" y="930" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2ve3" edge="1" parent="1" source="p2wpy" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p2cf2" value="POST /prompt">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2ve4" edge="1" parent="1" source="p2cf2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p2ltx" value="inference">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1012" y="1060" />
+              <mxPoint x="1400" y="1060" />
+              <mxPoint x="1400" y="860" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2ve5" edge="1" parent="1" source="p2vi" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#3b82f6;" target="p2r2" value="upload">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="778" y="1120" />
+              <mxPoint x="1448" y="1120" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2xe4" edge="1" parent="1" source="p2w2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#3b82f6;" target="p2vi" value="rent instance">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="400" y="500" />
+              <mxPoint x="778" y="500" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2xe5" edge="1" parent="1" source="p2w5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#3b82f6;" target="p2wpy" value="Worker API">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="920" y="550" />
+              <mxPoint x="1430" y="550" />
+              <mxPoint x="1430" y="986" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2xe6" edge="1" parent="1" source="p2w6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ef4444;fontColor=#ef4444;" target="p2vi" value="destroy">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1185" y="630" />
+              <mxPoint x="900" y="630" />
+              <mxPoint x="900" y="883" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="3. Стейт-машины" id="7h_Es3ZbgkiIp25KGwn5">
+    <mxGraphModel dx="1212" dy="828" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="1">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="p3t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#1a1a2e;" value="Стейт-машины: стримы и задания (jobs)" vertex="1">
+          <mxGeometry height="46" width="1500" x="77" y="15" as="geometry" />
+        </mxCell>
+        <mxCell id="p3s" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#555555;" value="Каждый стрим и каждый job проходят чёткий жизненный цикл. Reaper восстанавливает зависшие переходы каждые 15 минут." vertex="1">
+          <mxGeometry height="28" width="1500" x="77" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p3sb" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#93c5fd;fontSize=14;fontStyle=1;fontColor=#1e3a8a;verticalAlign=top;arcSize=3;" value="СТРИМ (Stream) — состояние всей серии видео" vertex="1">
+          <mxGeometry height="615" width="740" x="40" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="p3s0" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f3f4f6;strokeColor=#9ca3af;fontSize=11;fontStyle=1;" value="draft&lt;br/&gt;Черновик" vertex="1">
+          <mxGeometry height="70" width="140" x="110" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="p3s1" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#3b82f6;fontSize=11;fontStyle=1;" value="queued&lt;br/&gt;В очереди" vertex="1">
+          <mxGeometry height="70" width="140" x="330" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="p3s2" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#f59e0b;fontSize=11;fontStyle=1;" value="running&lt;br/&gt;Генерируется" vertex="1">
+          <mxGeometry height="70" width="140" x="220" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="p3s3" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d1fae5;strokeColor=#22c55e;fontSize=11;fontStyle=1;" value="completed ✓&lt;br/&gt;Завершён" vertex="1">
+          <mxGeometry height="70" width="140" x="90" y="455" as="geometry" />
+        </mxCell>
+        <mxCell id="p3s4" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fef2f2;strokeColor=#ef4444;fontSize=11;fontStyle=1;" value="failed ✗&lt;br/&gt;Провалился" vertex="1">
+          <mxGeometry height="70" width="140" x="355" y="455" as="geometry" />
+        </mxCell>
+        <mxCell id="p3s5" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f3f4f6;strokeColor=#9ca3af;fontSize=11;fontStyle=1;" value="cancelled&lt;br/&gt;Отменён" vertex="1">
+          <mxGeometry height="70" width="140" x="545" y="305" as="geometry" />
+        </mxCell>
+        <mxCell id="p3se1" edge="1" parent="1" source="p3s0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p3s1" value="оператор создаёт">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3se2" edge="1" parent="1" source="p3s1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p3s2" value="первый batch">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3se3" edge="1" parent="1" source="p3s2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#22c55e;fontColor=#22c55e;" target="p3s3" value="все videos_rendered">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3se4" edge="1" parent="1" source="p3s2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ef4444;fontColor=#ef4444;" target="p3s4" value="все jobs terminal">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3se5" edge="1" parent="1" source="p3s2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#9ca3af;" target="p3s5" value="оператор отменяет">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3se6" edge="1" parent="1" source="p3s2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#ca8a04;fontColor=#ca8a04;" target="p3s3" value="reaper: orphan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3sn1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefce8;strokeColor=#ca8a04;fontSize=11;arcSize=6;" value="vast_instance_id:&lt;br/&gt;NULL → &#39;pending&#39; → &#39;35088378&#39;" vertex="1">
+          <mxGeometry height="55" width="200" x="95" y="395" as="geometry" />
+        </mxCell>
+        <mxCell id="p3sn2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=6;" value="Reaper Sweep 3:&lt;br/&gt;• vast_instance_id=&#39;pending&#39; &gt;5 мин → сброс + переарендует&lt;br/&gt;• NULL + pending jobs &gt;5 мин → новый провижн" vertex="1">
+          <mxGeometry height="60" width="660" x="55" y="560" as="geometry" />
+        </mxCell>
+        <mxCell id="p3jb" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d1fae5;strokeColor=#6ee7b7;fontSize=14;fontStyle=1;fontColor=#065f46;verticalAlign=top;arcSize=3;" value="JOB (Задание) — состояние одного видео" vertex="1">
+          <mxGeometry height="660" width="800" x="820" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="p3j0" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f3f4f6;strokeColor=#9ca3af;fontSize=11;fontStyle=1;" value="pending&lt;br/&gt;Ожидает" vertex="1">
+          <mxGeometry height="70" width="135" x="880" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="p3j1" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#f59e0b;fontSize=11;fontStyle=1;" value="rendering&lt;br/&gt;Рендерится" vertex="1">
+          <mxGeometry height="70" width="140" x="1080" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="p3j2" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#3b82f6;fontSize=11;fontStyle=1;" value="rendered&lt;br/&gt;Готово" vertex="1">
+          <mxGeometry height="70" width="135" x="1320" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="p3j3" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#3b82f6;fontSize=11;fontStyle=1;" value="publishing&lt;br/&gt;Публикуется" vertex="1">
+          <mxGeometry height="70" width="135" x="1320" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="p3j4" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d1fae5;strokeColor=#22c55e;fontSize=11;fontStyle=1;" value="published ✓" vertex="1">
+          <mxGeometry height="70" width="140" x="1200" y="465" as="geometry" />
+        </mxCell>
+        <mxCell id="p3j5" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fef2f2;strokeColor=#ef4444;fontSize=11;fontStyle=1;" value="failed ✗" vertex="1">
+          <mxGeometry height="70" width="135" x="885" y="465" as="geometry" />
+        </mxCell>
+        <mxCell id="p3j6" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f3f4f6;strokeColor=#9ca3af;fontSize=11;fontStyle=1;" value="cancelled" vertex="1">
+          <mxGeometry height="70" width="135" x="840" y="315" as="geometry" />
+        </mxCell>
+        <mxCell id="p3je1" edge="1" parent="1" source="p3j0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p3j1" value="worker.py /claim">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3je2" edge="1" parent="1" source="p3j1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#22c55e;fontColor=#22c55e;" target="p3j2" value="/complete">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3je3" edge="1" parent="1" source="p3j2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p3j3" value="enqueue publish">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3je4" edge="1" parent="1" source="p3j3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#22c55e;fontColor=#22c55e;" target="p3j4" value="publisher OK">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3je5" edge="1" parent="1" source="p3j1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#f59e0b;fontColor=#f59e0b;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="p3j0" value="/fail (attempts&lt;max)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3je6" edge="1" parent="1" source="p3j1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ef4444;fontColor=#ef4444;" target="p3j5" value="/fail (attempts≥max)">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1040" y="200" />
+              <mxPoint x="1040" y="500" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3je7" edge="1" parent="1" source="p3j1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#ca8a04;fontColor=#ca8a04;" target="p3j0" value="reaper timeout &gt;25m">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3jn1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef2f2;strokeColor=#ef4444;fontSize=11;arcSize=6;" value="render_attempts / max_attempts = 3&lt;br/&gt;attempts &lt; max → retry (pending)&lt;br/&gt;attempts ≥ max → terminal (failed)" vertex="1">
+          <mxGeometry height="60" width="420" x="835" y="560" as="geometry" />
+        </mxCell>
+        <mxCell id="p3jn2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=6;" value="wait_for_comfyui() — защита от write-timeout:&lt;br/&gt;worker.py ждёт GET /queue=200 перед первым /claim.&lt;br/&gt;ComfyUI грузит 46 ГБ модель ~2-5 мин после старта процесса." vertex="1">
+          <mxGeometry height="58" width="780" x="835" y="632" as="geometry" />
+        </mxCell>
+        <mxCell id="p3rel" parent="1" style="text;html=1;strokeColor=#6b7280;fillColor=#f9fafb;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;fontStyle=1;" value="1 стрим → N заданий.   stream.videos_rendered = count(job.state=&#39;published&#39;).   Стрим completed когда все jobs terminal." vertex="1">
+          <mxGeometry height="55" width="1574" x="40" y="735" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="4. Bootstrap GPU" id="2eWD3XpXssjAvFDSA9gO">
+    <mxGraphModel dx="1747" dy="920" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="1">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="p4t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#1a1a2e;" value="Запуск GPU-воркера: хронология холодного старта (примерно накинул)" vertex="1">
+          <mxGeometry height="46" width="1500" x="77" y="15" as="geometry" />
+        </mxCell>
+        <mxCell id="p4s" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#555555;" value="От аренды инстанса до первого готового видео. RTX 5090, базовый pytorch образ. Загрузка модели из R2 (~500 MB/s)." vertex="1">
+          <mxGeometry height="28" width="1500" x="77" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p4ax" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#e2e8f0;" value="" vertex="1">
+          <mxGeometry height="55" width="1574" x="40" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="p4tk0" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=11;fontColor=#64748b;" value="t+0m" vertex="1">
+          <mxGeometry height="32" width="62" x="40" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="p4tk5" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=11;fontColor=#64748b;" value="t+5m" vertex="1">
+          <mxGeometry height="32" width="62" x="171.16666666666666" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="p4tk10" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=11;fontColor=#64748b;" value="t+10m" vertex="1">
+          <mxGeometry height="32" width="62" x="302.3333333333333" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="p4tk15" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=11;fontColor=#64748b;" value="t+15m" vertex="1">
+          <mxGeometry height="32" width="62" x="433.5" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="p4tk20" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=11;fontColor=#64748b;" value="t+20m" vertex="1">
+          <mxGeometry height="32" width="62" x="564.6666666666666" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="p4tk25" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=11;fontColor=#64748b;" value="t+25m" vertex="1">
+          <mxGeometry height="32" width="62" x="695.8333333333334" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="p4tk30" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=11;fontColor=#64748b;" value="t+30m" vertex="1">
+          <mxGeometry height="32" width="62" x="827" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="p4tk35" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=11;fontColor=#64748b;" value="t+35m" vertex="1">
+          <mxGeometry height="32" width="62" x="958.1666666666666" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="p4tk40" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=11;fontColor=#64748b;" value="t+40m" vertex="1">
+          <mxGeometry height="32" width="62" x="1089.3333333333333" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="p4tk45" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=11;fontColor=#64748b;" value="t+45m" vertex="1">
+          <mxGeometry height="32" width="62" x="1220.5" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="p4tk50" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=11;fontColor=#64748b;" value="t+50m" vertex="1">
+          <mxGeometry height="32" width="62" x="1351.6666666666667" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="p4tk55" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=11;fontColor=#64748b;" value="t+55m" vertex="1">
+          <mxGeometry height="32" width="62" x="1482.8333333333333" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="p4tk60" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=11;fontColor=#64748b;" value="t+60m" vertex="1">
+          <mxGeometry height="32" width="62" x="1614" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="p4rl" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontSize=11;fontStyle=1;" value="Детальная&lt;br/&gt;разбивка →" vertex="1">
+          <mxGeometry height="110" width="35" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="p4rl2" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontSize=11;fontStyle=1;" value="Суммарно →" vertex="1">
+          <mxGeometry height="60" width="35" y="305" as="geometry" />
+        </mxCell>
+        <mxCell id="p4p0" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#94a3b8;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;Аренда&lt;/b&gt;&lt;br/&gt;loading" vertex="1">
+          <mxGeometry height="110" width="52.46666666666667" x="40" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="p4p1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#f59e0b;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;Docker image pull&lt;/b&gt;&lt;br/&gt;pytorch:2.6.0-cuda12.6&lt;br/&gt;~13-15 мин" vertex="1">
+          <mxGeometry height="110" width="393.5" x="92.46666666666667" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="p4p2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#8b5cf6;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;bootstrap.sh&lt;/b&gt;&lt;br/&gt;apt + pip + ComfyUI&lt;br/&gt;+ LTXVideo node" vertex="1">
+          <mxGeometry height="110" width="157.4" x="485.96666666666664" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="p4p3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#3b82f6;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;PyTorch nightly&lt;/b&gt;&lt;br/&gt;cu128 (sm_120)&lt;br/&gt;перезаписывает stable" vertex="1">
+          <mxGeometry height="110" width="78.7" x="643.3666666666667" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="p4p4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#22c55e;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;LTX-2.3 (46 ГБ)&lt;/b&gt;&lt;br/&gt;из R2 @500 MB/s&lt;br/&gt;~1.5 мин ✓" vertex="1">
+          <mxGeometry height="110" width="52.46666666666667" x="722.0666666666667" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="p4p5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#16a34a;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;ComfyUI старт&lt;/b&gt;" vertex="1">
+          <mxGeometry height="110" width="26.233333333333334" x="774.5333333333333" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="p4p6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef9c3;strokeColor=#ca8a04;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;Загрузка в VRAM&lt;/b&gt;&lt;br/&gt;46 ГБ → 32 ГБ VRAM&lt;br/&gt;wait_for_comfyui()⏳" vertex="1">
+          <mxGeometry height="110" width="131.16666666666666" x="800.7666666666667" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="p4p7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbf7d0;strokeColor=#16a34a;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;worker.py ready!&lt;/b&gt;&lt;br/&gt;/queue=200 OK&lt;br/&gt;Клеймит первый job" vertex="1">
+          <mxGeometry height="110" width="52.46666666666667" x="931.9333333333333" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="p4p8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fed7aa;strokeColor=#ea580c;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;Генерация видео #1&lt;/b&gt;&lt;br/&gt;ComfyUI /prompt&lt;br/&gt;~2-5 мин" vertex="1">
+          <mxGeometry height="110" width="131.16666666666666" x="984.4" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="p4p9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;Upload R2 + publish&lt;/b&gt;&lt;br/&gt;+ след. job" vertex="1">
+          <mxGeometry height="110" width="52.46666666666667" x="1115.5666666666666" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="p4pA" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fed7aa;strokeColor=#ea580c;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;Видео #2, #3 … #N&lt;/b&gt;&lt;br/&gt;(цикл повторяется)" vertex="1">
+          <mxGeometry height="110" width="445.96666666666664" x="1168.0333333333333" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="p4s0" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#94a3b8;fontSize=10;arcSize=4;verticalAlign=middle;" value="Аренда" vertex="1">
+          <mxGeometry height="60" width="52.46666666666667" x="40" y="305" as="geometry" />
+        </mxCell>
+        <mxCell id="p4s1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef9c3;strokeColor=#d97706;fontSize=10;arcSize=4;verticalAlign=middle;" value="Cold start + bootstrap (~26-28 мин)" vertex="1">
+          <mxGeometry height="60" width="682.0666666666667" x="92.46666666666667" y="305" as="geometry" />
+        </mxCell>
+        <mxCell id="p4s2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#f59e0b;fontSize=10;arcSize=4;verticalAlign=middle;" value="Загрузка VRAM (~5 мин)" vertex="1">
+          <mxGeometry height="60" width="157.4" x="774.5333333333333" y="305" as="geometry" />
+        </mxCell>
+        <mxCell id="p4s3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbf7d0;strokeColor=#16a34a;fontSize=10;arcSize=4;verticalAlign=middle;" value="Генерация (каждые ~2-5 мин × N видео)" vertex="1">
+          <mxGeometry height="60" width="682.0666666666667" x="931.9333333333333" y="305" as="geometry" />
+        </mxCell>
+        <mxCell id="p4n1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef2f2;strokeColor=#ef4444;fontSize=11;arcSize=6;" value="⚠️ &lt;b&gt;Зачем wait_for_comfyui()?&lt;/b&gt;&lt;br/&gt;До фикса: worker.py стартовал сразу после bootstrap. ComfyUI принимал TCP, но ещё грузил модель в VRAM.&lt;br/&gt;Результат: &lt;urlopen error: write operation timed out&gt; — потеря render_attempts, job не отрендерен.&lt;br/&gt;После фикса: worker.py поллит GET /queue каждые 5с до 200 OK (до 10 мин), и только потом клеймит первый job." vertex="1">
+          <mxGeometry height="115" width="770" x="40" y="395" as="geometry" />
+        </mxCell>
+        <mxCell id="p4n2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#22c55e;fontSize=11;arcSize=6;" value="💡 &lt;b&gt;R2 vs HuggingFace для загрузки модели&lt;/b&gt;&lt;br/&gt;R2 (Cloudflare): ~500 MB/s → 46 ГБ за ~1.5 мин 🚀&lt;br/&gt;HuggingFace fallback: ~11 MB/s → 46 ГБ за ~70 мин 🐌&lt;br/&gt;Всегда используем R2 как основной источник." vertex="1">
+          <mxGeometry height="95" width="770" x="840" y="395" as="geometry" />
+        </mxCell>
+        <mxCell id="p4n3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefce8;strokeColor=#ca8a04;fontSize=11;arcSize=6;" value="🖥️ &lt;b&gt;Требования к GPU-инстансу (фильтр Vast.ai)&lt;/b&gt;&lt;br/&gt;VRAM ≥ 30 ГБ (RTX 5090 = 32 ГБ)  |  RAM ≥ 48 ГБ&lt;br/&gt;Disk ≥ 120 ГБ  |  Inet ≥ 500 Mbps  |  Reliability ≥ 0.98&lt;br/&gt;GPU: предпочтение RTX 5090 (Blackwell sm_120 — требует PyTorch nightly cu128)" vertex="1">
+          <mxGeometry height="110" width="770" x="40" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="p4n4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=6;" value="🔮 &lt;b&gt;Оптимизация: pre-built Docker image&lt;/b&gt;&lt;br/&gt;Сейчас: базовый pytorch образ + bootstrap = ~25-30 мин cold start.&lt;br/&gt;Pre-built image с PyTorch+ComfyUI+нодами: cold start сократится до ~5-7 мин.&lt;br/&gt;Экономит ~20 мин аренды и $0.5–1 на каждый стрим." vertex="1">
+          <mxGeometry height="115" width="770" x="840" y="510" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="5. Защита от сбоев" id="Fx-OES7l_YRvENNOPQx4">
+    <mxGraphModel grid="1" page="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="1">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="p5t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#1a1a2e;" value="Защита от сбоев: Reaper и восстановление" vertex="1">
+          <mxGeometry height="46" width="1500" x="77" y="15" as="geometry" />
+        </mxCell>
+        <mxCell id="p5s" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#555555;" value="Reaper запускается каждые 15 минут как Cloudflare Scheduled Worker. Sweeps 1–3 параллельно, Sweep 4 — последним." vertex="1">
+          <mxGeometry height="28" width="1500" x="77" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p5r" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1e3a8a;strokeColor=#1e3a8a;fontSize=14;fontStyle=1;fontColor=#ffffff;arcSize=10;" value="⏰ REAPER&lt;br/&gt;Cloudflare Cron&lt;br/&gt;каждые 15 минут&lt;br/&gt;src/cron/reaper.ts" vertex="1">
+          <mxGeometry height="120" width="250" x="677" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef2f2;strokeColor=#ef4444;fontSize=13;fontStyle=1;fontColor=#991b1b;verticalAlign=top;arcSize=4;" value="SWEEP 1: Зависшие рендеры" vertex="1">
+          <mxGeometry height="355" width="370" x="40" y="275" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=13;fontStyle=1;fontColor=#9a3412;verticalAlign=top;arcSize=4;" value="SWEEP 2: Брошенные инстансы" vertex="1">
+          <mxGeometry height="355" width="370" x="440" y="275" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef9c3;strokeColor=#ca8a04;fontSize=13;fontStyle=1;fontColor=#713f12;verticalAlign=top;arcSize=4;" value="SWEEP 3: Зависший провижн" vertex="1">
+          <mxGeometry height="355" width="370" x="840" y="275" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f3ff;strokeColor=#8b5cf6;fontSize=13;fontStyle=1;fontColor=#5b21b6;verticalAlign=top;arcSize=4;" value="SWEEP 4: Призрачные стримы" vertex="1">
+          <mxGeometry height="355" width="370" x="1244" y="275" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw1q" parent="1" style="text;html=1;strokeColor=#ef4444;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;" value="&lt;b&gt;Условие:&lt;/b&gt; job.state = &#39;rendering&#39;&lt;br/&gt;AND render_started_at &lt; now − 25 мин" vertex="1">
+          <mxGeometry height="70" width="340" x="55" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw1a" parent="1" style="text;html=1;strokeColor=#ef4444;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;" value="&lt;b&gt;Действие:&lt;/b&gt;&lt;br/&gt;attempts &lt; max → state=&#39;pending&#39; (retry)&lt;br/&gt;attempts ≥ max → state=&#39;failed&#39; (terminal)&lt;br/&gt;+videos_failed в стриме" vertex="1">
+          <mxGeometry height="95" width="340" x="55" y="415" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw1w" parent="1" style="text;html=1;strokeColor=#9ca3af;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;" value="🔍 &lt;b&gt;Причины:&lt;/b&gt; ComfyUI упал / инстанс прерван Vast.ai / worker.py завис" vertex="1">
+          <mxGeometry height="60" width="340" x="55" y="525" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw2q" parent="1" style="text;html=1;strokeColor=#f97316;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;" value="&lt;b&gt;Условие:&lt;/b&gt; stream.state=&#39;running&#39;&lt;br/&gt;AND все jobs terminal&lt;br/&gt;(rendered/published/failed/cancelled)" vertex="1">
+          <mxGeometry height="80" width="340" x="455" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw2a" parent="1" style="text;html=1;strokeColor=#f97316;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;" value="&lt;b&gt;Действие:&lt;/b&gt;&lt;br/&gt;stream.state → &#39;completed&#39;&lt;br/&gt;Vast.ai DELETE instance (уничтожает GPU)&lt;br/&gt;Расходы прекращаются" vertex="1">
+          <mxGeometry height="85" width="340" x="455" y="425" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw2w" parent="1" style="text;html=1;strokeColor=#9ca3af;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;" value="🔍 &lt;b&gt;Причины:&lt;/b&gt; worker.py вышел без /done / сигнал потерян при последнем видео" vertex="1">
+          <mxGeometry height="60" width="340" x="455" y="525" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw3q" parent="1" style="text;html=1;strokeColor=#ca8a04;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;" value="&lt;b&gt;Условие A:&lt;/b&gt; vast_instance_id=&#39;pending&#39; &gt;5 мин&lt;br/&gt;&lt;b&gt;Условие B:&lt;/b&gt; vast_instance_id=NULL AND pending jobs AND started &gt;5 мин" vertex="1">
+          <mxGeometry height="90" width="340" x="855" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw3a" parent="1" style="text;html=1;strokeColor=#ca8a04;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;" value="&lt;b&gt;Действие:&lt;/b&gt;&lt;br/&gt;vast_instance_id → NULL&lt;br/&gt;Re-enqueue с batch_index=99 (sentinel)&lt;br/&gt;→ provisionVastInstance() без prompt-gen" vertex="1">
+          <mxGeometry height="90" width="340" x="855" y="432" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw3w" parent="1" style="text;html=1;strokeColor=#9ca3af;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;" value="🔍 &lt;b&gt;Причины:&lt;/b&gt; CF Worker timeout при аренде / Vast API временно недоступен / race при деплое" vertex="1">
+          <mxGeometry height="60" width="340" x="855" y="535" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw4q" parent="1" style="text;html=1;strokeColor=#8b5cf6;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;" value="&lt;b&gt;Условие:&lt;/b&gt; stream.state=&#39;running&#39;&lt;br/&gt;AND started_at &lt; now − 6 часов" vertex="1">
+          <mxGeometry height="65" width="340" x="1259" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw4a" parent="1" style="text;html=1;strokeColor=#8b5cf6;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;" value="&lt;b&gt;Действие:&lt;/b&gt;&lt;br/&gt;Только логирует alert.&lt;br/&gt;НЕ авто-убивает — нужно&lt;br/&gt;ручное расследование." vertex="1">
+          <mxGeometry height="80" width="340" x="1259" y="410" as="geometry" />
+        </mxCell>
+        <mxCell id="p5sw4w" parent="1" style="text;html=1;strokeColor=#9ca3af;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;" value="🔍 &lt;b&gt;Причины:&lt;/b&gt; Тысячи видео / медленный хост / логическая ошибка в коде" vertex="1">
+          <mxGeometry height="60" width="340" x="1259" y="505" as="geometry" />
+        </mxCell>
+        <mxCell id="p5re1" edge="1" parent="1" source="p5r" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ef4444;fontColor=#ef4444;" target="p5sw1" value="каждые 15 мин">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p5re2" edge="1" parent="1" source="p5r" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#f97316;fontColor=#f97316;" target="p5sw2" value="параллельно">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p5re3" edge="1" parent="1" source="p5r" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#ca8a04;fontColor=#ca8a04;" target="p5sw3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p5re4" edge="1" parent="1" source="p5r" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#8b5cf6;fontColor=#8b5cf6;" target="p5sw4" value="затем">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rpbg" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#94a3b8;fontSize=13;fontStyle=1;fontColor=#374151;verticalAlign=top;arcSize=4;" value="ОБЩИЙ ПАТТЕРН ВОССТАНОВЛЕНИЯ" vertex="1">
+          <mxGeometry height="270" width="1574" x="40" y="655" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rp1" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fef2f2;strokeColor=#ef4444;fontSize=11;fontStyle=1;" value="Сбой&lt;br/&gt;обнаружен" vertex="1">
+          <mxGeometry height="60" width="120" x="80" y="705" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rp2" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#3b82f6;fontSize=11;fontStyle=1;" value="Reaper&lt;br/&gt;sweep" vertex="1">
+          <mxGeometry height="60" width="120" x="270" y="705" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rp3" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#f59e0b;fontSize=11;fontStyle=1;" value="State&lt;br/&gt;сброшен" vertex="1">
+          <mxGeometry height="60" width="120" x="460" y="705" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rp4" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f3ff;strokeColor=#8b5cf6;fontSize=11;fontStyle=1;" value="Re-enqueue&lt;br/&gt;CF Queue" vertex="1">
+          <mxGeometry height="60" width="130" x="650" y="705" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rp5" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#3b82f6;fontSize=11;fontStyle=1;" value="Consumer&lt;br/&gt;обрабатывает" vertex="1">
+          <mxGeometry height="60" width="135" x="850" y="705" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rp6" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#d97706;fontSize=11;fontStyle=1;" value="Retryable?" vertex="1">
+          <mxGeometry height="80" width="120" x="1060" y="695" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rp7" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d1fae5;strokeColor=#22c55e;fontSize=11;fontStyle=1;" value="Завершено ✓" vertex="1">
+          <mxGeometry height="60" width="120" x="1270" y="685" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rp8" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fef2f2;strokeColor=#ef4444;fontSize=11;fontStyle=1;" value="Failed terminal" vertex="1">
+          <mxGeometry height="60" width="130" x="1270" y="775" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rpe1" edge="1" parent="1" source="p5rp1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p5rp2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rpe2" edge="1" parent="1" source="p5rp2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p5rp3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rpe3" edge="1" parent="1" source="p5rp3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p5rp4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rpe4" edge="1" parent="1" source="p5rp4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p5rp5" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rpe5" edge="1" parent="1" source="p5rp5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p5rp6" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rpe6" edge="1" parent="1" source="p5rp6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#22c55e;fontColor=#22c55e;" target="p5rp7" value="да">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p5rpe7" edge="1" parent="1" source="p5rp6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ef4444;fontColor=#ef4444;" target="p5rp8" value="нет">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p5idem" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=6;" value="🔒 &lt;b&gt;Идемпотентность:&lt;/b&gt; Все операции безопасны для повтора. jobs имеют UNIQUE (stream_id, sequence_num) — дубликаты игнорируются. Vast.ai /instances — retry-loop 5×2с. CF Queues — max_retries=2." vertex="1">
+          <mxGeometry height="75" width="1200" x="80" y="805" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="6. Промпт-пайплайн" id="CrVbPAkmcPRUATHXwifD">
+    <mxGraphModel dx="5063" dy="2766" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="1">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="p6t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#1a1a2e;" value="Промпт-пайплайн: как генерируются уникальные промпты" vertex="1">
+          <mxGeometry height="46" width="1500" x="180" y="-350" as="geometry" />
+        </mxCell>
+        <mxCell id="p6s" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#555555;" value="2 вызова Gemini API на промпт. SHA-256 fingerprint. Проверка по D1 перед принятием. До 4 reroll-попыток на слот. Гарантированная уникальность между всеми стримами." vertex="1">
+          <mxGeometry height="28" width="1500" x="180" y="-290" as="geometry" />
+        </mxCell>
+        <mxCell id="p6st0" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#8b5cf6;fontSize=12;fontStyle=1;arcSize=6;" value="① PLAN" vertex="1">
+          <mxGeometry height="70" width="130" x="50" y="-147.5" as="geometry" />
+        </mxCell>
+        <mxCell id="p6st1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#3b82f6;fontSize=12;fontStyle=1;arcSize=6;" value="② FINGERPRINT" vertex="1">
+          <mxGeometry height="70" width="130" x="50" y="10" as="geometry" />
+        </mxCell>
+        <mxCell id="p6st2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef9c3;strokeColor=#ca8a04;fontSize=12;fontStyle=1;arcSize=6;" value="③ DEDUP CHECK" vertex="1">
+          <mxGeometry height="70" width="130" x="40" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="p6st3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#8b5cf6;fontSize=12;fontStyle=1;arcSize=6;" value="④ RENDER" vertex="1">
+          <mxGeometry height="70" width="130" x="-1320" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="p6st4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef2f2;strokeColor=#ef4444;fontSize=12;fontStyle=1;arcSize=6;" value="⑤ VALIDATE" vertex="1">
+          <mxGeometry height="70" width="130" x="10" y="775" as="geometry" />
+        </mxCell>
+        <mxCell id="p6st5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d1fae5;strokeColor=#22c55e;fontSize=12;fontStyle=1;arcSize=6;" value="⑥ PERSIST" vertex="1">
+          <mxGeometry height="70" width="130" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="p6st6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbf7d0;strokeColor=#16a34a;fontSize=12;fontStyle=1;arcSize=6;" value="⑦ READY" vertex="1">
+          <mxGeometry height="70" width="130" x="20" y="1055" as="geometry" />
+        </mxCell>
+        <mxCell id="p6st7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=12;fontStyle=1;arcSize=6;" value="↻ REROLL" vertex="1">
+          <mxGeometry height="70" width="130" x="30" y="1170" as="geometry" />
+        </mxCell>
+        <mxCell id="p6b1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#faf5ff;strokeColor=#a855f7;fontSize=11;arcSize=10;" value="&lt;b&gt;generateBrief(avoidThemes, streamContext)&lt;/b&gt;&lt;br/&gt;src/prompts/planner.ts&lt;br/&gt;&lt;br/&gt;Gemini API — temperature=0.95 (макс. разнообразие)&lt;br/&gt;System prompt: правила уникальной сцены, без surreal anatomy&lt;br/&gt;avoidThemes: последние 30 использованных theme/subject → плановщик избегает их&lt;br/&gt;Возвращает JSON с 8 полями:" vertex="1">
+          <mxGeometry height="95" width="680" x="250" y="-160" as="geometry" />
+        </mxCell>
+        <mxCell id="p6f0" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f3ff;strokeColor=#c4b5fd;fontSize=10;arcSize=6;" value="&lt;b&gt;theme&lt;/b&gt;: напр. &#39;urban exploration&#39;" vertex="1">
+          <mxGeometry height="48" width="185" x="970" y="-160" as="geometry" />
+        </mxCell>
+        <mxCell id="p6f1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f3ff;strokeColor=#c4b5fd;fontSize=10;arcSize=6;" value="&lt;b&gt;subject&lt;/b&gt;: напр. &#39;young woman on rooftop&#39;" vertex="1">
+          <mxGeometry height="48" width="185" x="1170" y="-160" as="geometry" />
+        </mxCell>
+        <mxCell id="p6f2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f3ff;strokeColor=#c4b5fd;fontSize=10;arcSize=6;" value="&lt;b&gt;action&lt;/b&gt;: напр. &#39;walking along edge, arms out&#39;" vertex="1">
+          <mxGeometry height="48" width="185" x="1370" y="-160" as="geometry" />
+        </mxCell>
+        <mxCell id="p6f3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f3ff;strokeColor=#c4b5fd;fontSize=10;arcSize=6;" value="&lt;b&gt;environment&lt;/b&gt;: напр. &#39;nighttime cityscape, neon reflections&#39;" vertex="1">
+          <mxGeometry height="48" width="185" x="1590" y="-160" as="geometry" />
+        </mxCell>
+        <mxCell id="p6f4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f3ff;strokeColor=#c4b5fd;fontSize=10;arcSize=6;" value="&lt;b&gt;lighting&lt;/b&gt;: напр. &#39;blue-purple ambient, backlit&#39;" vertex="1">
+          <mxGeometry height="48" width="185" x="970" y="-100" as="geometry" />
+        </mxCell>
+        <mxCell id="p6f5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f3ff;strokeColor=#c4b5fd;fontSize=10;arcSize=6;" value="&lt;b&gt;camera&lt;/b&gt;: напр. &#39;low angle tracking shot, slow dolly&#39;" vertex="1">
+          <mxGeometry height="48" width="185" x="1170" y="-100" as="geometry" />
+        </mxCell>
+        <mxCell id="p6f6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f3ff;strokeColor=#c4b5fd;fontSize=10;arcSize=6;" value="&lt;b&gt;pace&lt;/b&gt;: напр. &#39;smooth, deliberate&#39;" vertex="1">
+          <mxGeometry height="48" width="185" x="1370" y="-100" as="geometry" />
+        </mxCell>
+        <mxCell id="p6f7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f3ff;strokeColor=#c4b5fd;fontSize=10;arcSize=6;" value="&lt;b&gt;hook&lt;/b&gt;: напр. &#39;opens on silhouette against skyline&#39;" vertex="1">
+          <mxGeometry height="48" width="185" x="1590" y="-100" as="geometry" />
+        </mxCell>
+        <mxCell id="p6b2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=10;" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;&lt;b&gt;computeFingerprint(brief)&lt;/b&gt;&lt;br&gt;src/prompts/fingerprint.ts&lt;br&gt;SHA-256 хэш четырёх ключевых полей: theme + subject + action + camera&lt;br&gt;Нормализация: lowercase + trim + collapse spaces&lt;br&gt;canonical = &#39;theme|subject|action|camera&#39; → sha256hex&lt;br&gt;Почему 4 поля, а не все 8?&lt;br&gt;Environment и lighting варьируются естественно — позволяем одну сцену в разном освещении.&lt;br&gt;Theme + subject + action + camera определяют визуальную идентичность сцены.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="110" width="1440" x="820" y="10" as="geometry" />
+        </mxCell>
+        <mxCell id="p6b3a" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9fafb;strokeColor=#6b7280;fontSize=11;arcSize=10;" value="&lt;b&gt;isDuplicate(db, fingerprint)&lt;/b&gt;&lt;br/&gt;SELECT 1 FROM prompt_fingerprints WHERE fingerprint = ?&lt;br/&gt;Проверка по D1 SQLite&lt;br/&gt;&lt;br/&gt;Если найдено → REROLL (попытка +1)" vertex="1">
+          <mxGeometry height="110" width="520" x="-540" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="p6b3b" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9fafb;strokeColor=#6b7280;fontSize=11;arcSize=10;" value="&lt;b&gt;Batch-check&lt;/b&gt;&lt;br/&gt;results.some(r =&gt; r.fingerprint === fp)&lt;br/&gt;Проверка внутри текущего батча&lt;br/&gt;&lt;br/&gt;Предотвращает дубли между видео&lt;br/&gt;одного батча (D1 ещё не обновлён)" vertex="1">
+          <mxGeometry height="110" width="520" x="940" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="p6b3c" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9fafb;strokeColor=#6b7280;fontSize=11;arcSize=10;" value="&lt;b&gt;avoidThemes tracking&lt;/b&gt;&lt;br/&gt;usedThemes.push(theme/subject)&lt;br/&gt;при каждом принятом промпте&lt;br/&gt;&lt;br/&gt;Плановщик получает список в след. итерации →&lt;br/&gt;3-уровневая защита от дублей" vertex="1">
+          <mxGeometry height="110" width="370" x="1490" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="ttNDG6qITpcUieB05yGR-1" edge="1" parent="1" source="p6b4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p6b6" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p6b4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#faf5ff;strokeColor=#a855f7;fontSize=11;arcSize=10;" value="&lt;b&gt;renderPrompt(brief, durationSecs)&lt;/b&gt;&lt;br/&gt;src/prompts/renderer.ts&lt;br/&gt;&lt;br/&gt;Gemini API — temperature=0.7 (стабильнее, меньше галлюцинаций)&lt;br/&gt;System prompt: правила LTX-2.3 (present tense, active voice, &lt;120 слов, без &#39;AI/generated/video&#39;)&lt;br/&gt;Передаёт все 8 полей brief + duration_secs → один плотный абзац на английском&lt;br/&gt;Пример: &#39;A young woman walks along a rooftop edge at night, arms outstretched, city lights glowing below...&#39;" vertex="1">
+          <mxGeometry height="110" width="1440" x="-1120" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="p6b5a" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef2f2;strokeColor=#ef4444;fontSize=11;arcSize=10;" value="&lt;b&gt;validateLength(promptText)&lt;/b&gt;&lt;br/&gt;Синхронная проверка (без LLM)&lt;br/&gt;Минимум / максимум символов&lt;br/&gt;Если не OK → REROLL" vertex="1">
+          <mxGeometry height="100" width="340" x="470" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="p6b5b" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef2f2;strokeColor=#ef4444;fontSize=11;arcSize=10;" value="&lt;b&gt;validatePrompt(promptText)&lt;/b&gt; — REJECT-паттерны:&lt;br/&gt;• crowded scene: &#39;multiple/several/crowd/group of 3-9 people&#39;&lt;br/&gt;• too many limbs: &#39;six/seven+ people/hands/arms&#39;&lt;br/&gt;• contradictory camera: &#39;zoom in&#39; + &#39;pan/tilt/dolly&#39;&lt;br/&gt;• contradictory pace: &#39;slow motion&#39; + &#39;fast-paced/rapid&#39;&lt;br/&gt;• conflicting actions: &#39;dancing and fighting&#39;&lt;br/&gt;→ любой REJECT = REROLL" vertex="1">
+          <mxGeometry height="115" width="700" x="990" y="730" as="geometry" />
+        </mxCell>
+        <mxCell id="p6b5c" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef9c3;strokeColor=#ca8a04;fontSize=11;arcSize=10;" value="&lt;b&gt;WARN-паттерны&lt;/b&gt;&lt;br/&gt;(не блокируют, только логируют):&lt;br/&gt;• vague qualifiers: beautiful/stunning/amazing&lt;br/&gt;• hand detail: hands/fingers holding/touching&lt;br/&gt;→ промпт принимается, WARNING в лог" vertex="1">
+          <mxGeometry height="105" width="365" x="1730" y="735" as="geometry" />
+        </mxCell>
+        <mxCell id="p6b6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#22c55e;fontSize=11;arcSize=10;" value="&lt;b&gt;saveFingerprint(db, fingerprint, streamId, jobId, brief)&lt;/b&gt;&lt;br/&gt;src/prompts/fingerprint.ts&lt;br/&gt;&lt;br/&gt;INSERT OR IGNORE INTO prompt_fingerprints (fingerprint, stream_id, job_id, created_at, theme, subject, action, environment, camera)&lt;br/&gt;INSERT OR IGNORE = идемпотентно (повтор сообщения из очереди не создаст дубль)&lt;br/&gt;Все 8 полей brief сохраняются для будущего аудита и отладки" vertex="1">
+          <mxGeometry height="110" width="1440" x="190" y="880" as="geometry" />
+        </mxCell>
+        <mxCell id="p6b7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#22c55e;fontSize=11;arcSize=10;" value="✅ &lt;b&gt;Уникальный, валидный промпт принят&lt;/b&gt;&lt;br/&gt;Возвращается в generatePromptBatch() → записывается в job.prompt_text → передаётся GPU worker-у через /jobs/claim&lt;br/&gt;Fingerprint заблокирует этот визуальный концепт для ВСЕХ будущих стримов на данной платформе." vertex="1">
+          <mxGeometry height="100" width="1440" x="200" y="1040" as="geometry" />
+        </mxCell>
+        <mxCell id="p6rer" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="↻ &lt;b&gt;REROLL&lt;/b&gt;&lt;br/&gt;MAX_REROLLS = 4&lt;br/&gt;попыток на слот&lt;br/&gt;&lt;br/&gt;При провале:&lt;br/&gt;attempt++ и заново&lt;br/&gt;с generateBrief()&lt;br/&gt;&lt;br/&gt;Если все 4 провалились:&lt;br/&gt;слот пропускается,&lt;br/&gt;стрим получит&lt;br/&gt;меньше видео" vertex="1">
+          <mxGeometry height="540" width="155" x="2520" y="285" as="geometry" />
+        </mxCell>
+        <mxCell id="p6e_p6b1_p6b2" edge="1" parent="1" source="p6b1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p6b2" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="530" y="140" />
+              <mxPoint x="760" y="140" />
+              <mxPoint x="760" y="185" />
+              <mxPoint x="910" y="185" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p6e_p6b2_p6b3a" edge="1" parent="1" source="p6b2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p6b3a" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p6e_p6b3a_p6b4" edge="1" parent="1" source="p6b3a" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p6b4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p6e_p6b4_p6b5a" edge="1" parent="1" source="p6b4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p6b5a" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="550" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p6e_p6b5a_p6b6" edge="1" parent="1" source="p6b5a" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p6b6" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p6e_p6b6_p6b7" edge="1" parent="1" source="p6b6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p6b7" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p6er1" edge="1" parent="1" source="p6b3a" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ef4444;fontColor=#ef4444;" target="p6rer" value="дубль">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1170" y="370" />
+              <mxPoint x="1170" y="470" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p6er2" edge="1" parent="1" source="p6b5a" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ef4444;fontColor=#ef4444;" target="p6rer" value="reject">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="360" y="640" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p6er3" edge="1" parent="1" source="p6b5b" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ef4444;fontColor=#ef4444;" target="p6rer" value="reject">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1220" y="540" />
+              <mxPoint x="1220" y="540" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p6er4" edge="1" parent="1" source="p6rer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#f97316;fontColor=#f97316;" target="p6b1" value="reroll">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="530" y="630" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p6dedup" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=6;" value="🛡️ &lt;b&gt;3 уровня антидупликации:&lt;/b&gt;&lt;br/&gt;1. D1 fingerprint: глобальная проверка по всем прошлым промптам&lt;br/&gt;2. Batch-check: проверка внутри текущего батча (до записи в D1)&lt;br/&gt;3. avoidThemes: плановщик избегает уже использованных theme/subject в рамках батча" vertex="1">
+          <mxGeometry height="80" width="900" x="200" y="1170" as="geometry" />
+        </mxCell>
+        <mxCell id="p6gemini" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefce8;strokeColor=#ca8a04;fontSize=11;arcSize=6;" value="📡 &lt;b&gt;Gemini API вызовы на 1 промпт:&lt;/b&gt;&lt;br/&gt;• generateBrief() — 1 вызов (temp=0.95, max_tokens=512)&lt;br/&gt;• renderPrompt() — 1 вызов (temp=0.7, max_tokens=200)&lt;br/&gt;Итого: 2 API-вызова / промпт. Для 1000 видео = 2000 вызовов." vertex="1">
+          <mxGeometry height="80" width="520" x="1155" y="1160" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="7. Стрим на 1000 видео" id="GGcaytSIwG3diMo9CP2x">
+    <mxGraphModel dx="3463" dy="2366" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="1">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="p7t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#1a1a2e;" value="Конкретный пример: запуск стрима на 1000 видео" vertex="1">
+          <mxGeometry height="46" width="1500" x="77" y="15" as="geometry" />
+        </mxCell>
+        <mxCell id="p7s" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#555555;" value="Оператор нажимает «Запустить». Что происходит дальше — пошагово, с числами и временем. 1 GPU, 1000 видео, PROMPT_BATCH_SIZE=50." vertex="1">
+          <mxGeometry height="28" width="1500" x="77" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p7ph0" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#93c5fd;fontSize=13;fontStyle=1;fontColor=#1e40af;verticalAlign=top;arcSize=3;" value="PHASE 0: Оператор создаёт стрим" vertex="1">
+          <mxGeometry height="125" width="1574" x="40" y="105" as="geometry" />
+        </mxCell>
+        <mxCell id="p7p0a" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=10;" value="&lt;b&gt;Настройки стрима&lt;/b&gt;&lt;br/&gt;total_videos = 1000&lt;br/&gt;duration_secs = 5&lt;br/&gt;fps = 24&lt;br/&gt;aspect = 9:16" vertex="1">
+          <mxGeometry height="72" width="200" x="65" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p7p0b" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=10;" value="&lt;b&gt;D1 INSERT&lt;/b&gt;&lt;br/&gt;streams (state=&#39;queued&#39;)&lt;br/&gt;vast_instance_id = NULL&lt;br/&gt;videos_rendered = 0" vertex="1">
+          <mxGeometry height="72" width="230" x="295" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p7p0c" parent="1" style="shape=mxgraph.flowchart.multi-document;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#8b5cf6;fontSize=11;" value="&lt;b&gt;stream-queue.send()&lt;/b&gt;&lt;br/&gt;batch_index=0&lt;br/&gt;batch_size=50&lt;br/&gt;seq_start=1" vertex="1">
+          <mxGeometry height="72" width="210" x="555" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p7p0d" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9fafb;strokeColor=#6b7280;fontSize=11;arcSize=10;" value="&lt;b&gt;CF Queue принял&lt;/b&gt;&lt;br/&gt;Сообщение в очереди&lt;br/&gt;Consumer запустится&lt;br/&gt;в течение секунд" vertex="1">
+          <mxGeometry height="72" width="200" x="800" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p7p0e" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=10;" value="&lt;b&gt;stream.state → &#39;running&#39;&lt;/b&gt;&lt;br/&gt;Обновляется при&lt;br/&gt;первом batch" vertex="1">
+          <mxGeometry height="72" width="200" x="1035" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p7p0f" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;GPU арендуется&lt;/b&gt;&lt;br/&gt;Vast.ai API: create instance&lt;br/&gt;vast_instance_id=&#39;pending&#39;&lt;br/&gt;→ &#39;35088xxx&#39;" vertex="1">
+          <mxGeometry height="72" width="200" x="1280" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p7e0a" edge="1" parent="1" source="p7p0a" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7p0b" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7e0b" edge="1" parent="1" source="p7p0b" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7p0c" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7e0c" edge="1" parent="1" source="p7p0c" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7p0d" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7e0d" edge="1" parent="1" source="p7p0d" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7p0e" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7e0e" edge="1" parent="1" source="p7p0e" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7p0f" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7ph1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#c4b5fd;fontSize=13;fontStyle=1;fontColor=#5b21b6;verticalAlign=top;arcSize=3;" value="PHASE 1: Генерация промптов батчами (параллельно с cold start GPU)" vertex="1">
+          <mxGeometry height="270" width="1574" x="40" y="248" as="geometry" />
+        </mxCell>
+        <mxCell id="p7b0" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#faf5ff;strokeColor=#a855f7;fontSize=11;arcSize=10;" value="&lt;b&gt;Batch 0&lt;/b&gt; (seq 1–50)&lt;br/&gt;batch_index=0&lt;br/&gt;&lt;br/&gt;① generateBrief() × 50 → Gemini API&lt;br/&gt;② computeFingerprint() × 50 → SHA-256&lt;br/&gt;③ isDuplicate() × 50 → D1&lt;br/&gt;④ renderPrompt() × 50 → Gemini API&lt;br/&gt;⑤ validate × 50 → regex&lt;br/&gt;⑥ 50 INSERT jobs в D1&lt;br/&gt;⑦ 50 render-queue.send()&lt;br/&gt;⑧ stream-queue.send(batch_index=1)" vertex="1">
+          <mxGeometry height="210" width="290" x="65" y="288" as="geometry" />
+        </mxCell>
+        <mxCell id="p7b1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#faf5ff;strokeColor=#a855f7;fontSize=11;arcSize=10;" value="&lt;b&gt;Batch 1&lt;/b&gt; (seq 51–100)&lt;br/&gt;batch_index=1&lt;br/&gt;&lt;br/&gt;100 Gemini API calls&lt;br/&gt;50 D1 fingerprint checks&lt;br/&gt;50 D1 job inserts&lt;br/&gt;50 render-queue msgs&lt;br/&gt;+ stream-queue.send(batch_index=2)&lt;br/&gt;&lt;br/&gt;&lt;i&gt;И так далее каждый batch...&lt;/i&gt;" vertex="1">
+          <mxGeometry height="210" width="240" x="375" y="288" as="geometry" />
+        </mxCell>
+        <mxCell id="p7bdots" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=24;" value="…" vertex="1">
+          <mxGeometry height="80" width="40" x="625" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="p7b19" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#faf5ff;strokeColor=#a855f7;fontSize=11;arcSize=10;" value="&lt;b&gt;Batch 19&lt;/b&gt; (seq 951–1000)&lt;br/&gt;batch_index=19&lt;br/&gt;&lt;br/&gt;Последний батч&lt;br/&gt;remaining=50&lt;br/&gt;&lt;br/&gt;50 jobs → D1&lt;br/&gt;50 render-queue msgs&lt;br/&gt;&lt;b&gt;НЕТ&lt;/b&gt; след. stream-queue msg&lt;br/&gt;(remaining=0 после этого)" vertex="1">
+          <mxGeometry height="210" width="265" x="680" y="288" as="geometry" />
+        </mxCell>
+        <mxCell id="p7bs" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=6;" value="&lt;b&gt;Итого по батчам:&lt;/b&gt;&lt;br&gt;20 батчей × 50 видео = 1000 видео&lt;br&gt;20 батчей × 100 Gemini calls = 2000 API-вызовов&lt;br&gt;1000 jobs в D1 (state=&#39;pending&#39;)&lt;br&gt;1000 сообщений в render-queue&lt;br&gt;Батчи обрабатываются последовательно (~CF Worker 30с/батч)" vertex="1">
+          <mxGeometry height="165" width="640" x="960" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="p7qn" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefce8;strokeColor=#ca8a04;fontSize=11;arcSize=6;" value="&lt;b&gt;Очереди в этой фазе:&lt;/b&gt;&lt;br/&gt;stream-queue → batch_index 0,1,2...19 (chain)&lt;br/&gt;render-queue → 1000 job messages&lt;br/&gt;publish-queue → пусто (будет наполняться позже)" vertex="1">
+          <mxGeometry height="42" width="640" x="960" y="465" as="geometry" />
+        </mxCell>
+        <mxCell id="p7eb01" edge="1" parent="1" source="p7b0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7b1" value="re-enqueue">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7eb12" edge="1" parent="1" source="p7b1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7bdots" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7eb1920" edge="1" parent="1" source="p7bdots" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7b19" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7ph2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#fbbf24;fontSize=13;fontStyle=1;fontColor=#92400e;verticalAlign=top;arcSize=3;" value="PHASE 2: GPU холодный старт (~25-30 мин, параллельно с батчами)" vertex="1">
+          <mxGeometry height="160" width="1574" x="40" y="535" as="geometry" />
+        </mxCell>
+        <mxCell id="p7gp0" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#94a3b8;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;Аренда&lt;/b&gt;&lt;br/&gt;actual_status:&lt;br/&gt;loading" vertex="1">
+          <mxGeometry height="110" width="100" x="65" y="575" as="geometry" />
+        </mxCell>
+        <mxCell id="p7gp1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#f59e0b;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;Docker pull&lt;/b&gt;&lt;br/&gt;pytorch:2.6.0&lt;br/&gt;~13-15 мин" vertex="1">
+          <mxGeometry height="110" width="260" x="180" y="575" as="geometry" />
+        </mxCell>
+        <mxCell id="p7gp2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#8b5cf6;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;bootstrap.sh&lt;/b&gt;&lt;br/&gt;apt+pip+ComfyUI&lt;br/&gt;~6 мин" vertex="1">
+          <mxGeometry height="110" width="140" x="455" y="575" as="geometry" />
+        </mxCell>
+        <mxCell id="p7gp3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#3b82f6;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;PyTorch nightly&lt;/b&gt;&lt;br/&gt;cu128 (sm_120)&lt;br/&gt;~3 мин" vertex="1">
+          <mxGeometry height="110" width="90" x="610" y="575" as="geometry" />
+        </mxCell>
+        <mxCell id="p7gp4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#22c55e;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;LTX-2.3 из R2&lt;/b&gt;&lt;br/&gt;46 ГБ @500 MB/s&lt;br/&gt;~1.5 мин" vertex="1">
+          <mxGeometry height="110" width="75" x="715" y="575" as="geometry" />
+        </mxCell>
+        <mxCell id="p7gp5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#16a34a;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;ComfyUI&lt;/b&gt;&lt;br/&gt;старт" vertex="1">
+          <mxGeometry height="110" width="55" x="805" y="575" as="geometry" />
+        </mxCell>
+        <mxCell id="p7gp6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef9c3;strokeColor=#ca8a04;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;VRAM loading&lt;/b&gt;&lt;br/&gt;wait_for_comfyui()&lt;br/&gt;~5 мин" vertex="1">
+          <mxGeometry height="110" width="130" x="875" y="575" as="geometry" />
+        </mxCell>
+        <mxCell id="p7gp7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbf7d0;strokeColor=#16a34a;fontSize=10;arcSize=4;verticalAlign=middle;" value="&lt;b&gt;worker.py&lt;/b&gt;&lt;br/&gt;&lt;b&gt;READY!&lt;/b&gt;&lt;br/&gt;t≈+30 мин" vertex="1">
+          <mxGeometry height="110" width="90" x="1020" y="575" as="geometry" />
+        </mxCell>
+        <mxCell id="p7gn" parent="1" style="text;html=1;strokeColor=none;fillColor=#fef9c3;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;" value="Все 1000 job-записей уже в D1 (state=&#39;pending&#39;) — worker.py сразу начинает клеймить их одну за одной" vertex="1">
+          <mxGeometry height="80" width="480" x="1130" y="590" as="geometry" />
+        </mxCell>
+        <mxCell id="p7ph3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#fb923c;fontSize=13;fontStyle=1;fontColor=#9a3412;verticalAlign=top;arcSize=3;" value="PHASE 3: Цикл рендеринга (1 GPU × 1000 видео)" vertex="1">
+          <mxGeometry height="300" width="1574" x="40" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="p7rc1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;GET /worker/jobs/claim&lt;/b&gt;&lt;br/&gt;stream_id + instance_id&lt;br/&gt;→ job record (prompt_text,&lt;br/&gt;width, height, fps, duration)&lt;br/&gt;D1: state → &#39;rendering&#39;" vertex="1">
+          <mxGeometry height="120" width="220" x="65" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="p7rc2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;POST /prompt&lt;/b&gt;&lt;br/&gt;ComfyUI workflow JSON&lt;br/&gt;с prompt_text&lt;br/&gt;→ prompt_id" vertex="1">
+          <mxGeometry height="120" width="200" x="310" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="p7rc3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;ComfyUI рендерит&lt;/b&gt;&lt;br/&gt;LTX-2.3 inference&lt;br/&gt;RTX 5090, 32 ГБ VRAM&lt;br/&gt;~2-5 мин на видео&lt;br/&gt;~600-900 MB выход" vertex="1">
+          <mxGeometry height="120" width="210" x="535" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="p7rc4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;POST /worker/videos/:id&lt;/b&gt;&lt;br/&gt;Бинарные данные видео&lt;br/&gt;→ CF Worker&lt;br/&gt;→ R2 upload&lt;br/&gt;r2_key = &#39;streams/.../vid.mp4&#39;" vertex="1">
+          <mxGeometry height="120" width="215" x="775" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="p7rc5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;POST /jobs/:id/complete&lt;/b&gt;&lt;br/&gt;D1: state → &#39;rendered&#39;&lt;br/&gt;publish-queue.send()&lt;br/&gt;(job_id, stream_id)" vertex="1">
+          <mxGeometry height="120" width="215" x="1020" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="p7rc6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#22c55e;fontSize=11;arcSize=10;" value="&lt;b&gt;Publisher Bot&lt;/b&gt;&lt;br/&gt;Читает видео из R2&lt;br/&gt;Telegram sendVideo&lt;br/&gt;+ prompt_text caption&lt;br/&gt;D1: state → &#39;published&#39;" vertex="1">
+          <mxGeometry height="120" width="215" x="1265" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="p7re1" edge="1" parent="1" source="p7rc1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7rc2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7re2" edge="1" parent="1" source="p7rc2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7rc3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7re3" edge="1" parent="1" source="p7rc3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7rc4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7re4" edge="1" parent="1" source="p7rc4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7rc5" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7re5" edge="1" parent="1" source="p7rc5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7rc6" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7rloop" parent="1" style="text;html=1;strokeColor=#f97316;fillColor=#fff7ed;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=12;fontStyle=1;" value="↩ повторяется 1000 раз" vertex="1">
+          <mxGeometry height="60" width="1414" x="65" y="890" as="geometry" />
+        </mxCell>
+        <mxCell id="p7reloop" edge="1" parent="1" source="p7rc6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#f97316;fontColor=#f97316;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" target="p7rc1" value="след. job">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7ph4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d1fae5;strokeColor=#6ee7b7;fontSize=13;fontStyle=1;fontColor=#065f46;verticalAlign=top;arcSize=3;" value="PHASE 4: Завершение" vertex="1">
+          <mxGeometry height="130" width="1574" x="40" y="1025" as="geometry" />
+        </mxCell>
+        <mxCell id="p7fin1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#22c55e;fontSize=11;arcSize=10;" value="&lt;b&gt;POST /streams/:id/done&lt;/b&gt;&lt;br/&gt;worker.py видит idle 10 мин (все jobs claimed)&lt;br/&gt;Отправляет сигнал done в CF Worker" vertex="1">
+          <mxGeometry height="82" width="310" x="65" y="1062" as="geometry" />
+        </mxCell>
+        <mxCell id="p7fin2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#22c55e;fontSize=11;arcSize=10;" value="&lt;b&gt;Reaper orphan sweep&lt;/b&gt;&lt;br/&gt;(или /done сигнал) →&lt;br/&gt;stream.state → &#39;completed&#39;" vertex="1">
+          <mxGeometry height="82" width="270" x="395" y="1062" as="geometry" />
+        </mxCell>
+        <mxCell id="p7fin3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#f97316;fontSize=11;arcSize=10;" value="&lt;b&gt;Vast.ai DELETE instance&lt;/b&gt;&lt;br/&gt;GPU уничтожен&lt;br/&gt;Расходы прекращаются" vertex="1">
+          <mxGeometry height="82" width="260" x="685" y="1062" as="geometry" />
+        </mxCell>
+        <mxCell id="p7fin4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#22c55e;fontSize=11;arcSize=10;" value="&lt;b&gt;1000 видео в канале&lt;/b&gt;&lt;br/&gt;Каждое — уникальный промпт&lt;br/&gt;Нет повторов" vertex="1">
+          <mxGeometry height="82" width="260" x="965" y="1062" as="geometry" />
+        </mxCell>
+        <mxCell id="p7fe1" edge="1" parent="1" source="p7fin1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7fin2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7fe2" edge="1" parent="1" source="p7fin2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7fin3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7fe3" edge="1" parent="1" source="p7fin3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="p7fin4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p7cnt" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#3b82f6;fontSize=11;arcSize=6;" value="&lt;b&gt;Счётчики stream в D1 — прогресс:&lt;/b&gt;&lt;br/&gt;videos_queued: 0 → 50 → 100 → ... → 1000 (по мере обработки батчей)&lt;br/&gt;videos_rendered: 0 → 1 → 2 → ... → 1000 (по мере завершения jobs)&lt;br/&gt;videos_published: 0 → 1 → 2 → ... → 1000 (по мере публикации)&lt;br/&gt;videos_failed: 0 (при идеальном сценарии) / может быть &gt;0 если job failed terminal" vertex="1">
+          <mxGeometry height="80" width="1170" x="120" y="1220" as="geometry" />
+        </mxCell>
+        <mxCell id="p7reaper_note" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefce8;strokeColor=#ca8a04;fontSize=11;arcSize=6;" value="⏰ &lt;b&gt;Reaper каждые 15 мин:&lt;/b&gt;&lt;br/&gt;Stuck render &gt;25м → reset pending&lt;br/&gt;Orphan instance → destroy + complete&lt;br/&gt;Stuck provisioning → re-rent GPU" vertex="1">
+          <mxGeometry height="75" width="450" x="60" y="1360" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
