@@ -72,12 +72,18 @@ export class VastClient {
       params['num_gpus'] = { eq: query.num_gpus };
     }
 
-    const order = encodeURIComponent(query.order ?? 'dph_total asc');
     const limit = query.limit ?? 20;
 
-    // Correct search endpoint — /bundles is deprecated and always returns empty.
-    // order and limit are separate URL params (not inside q JSON).
-    const url = `${this.baseUrl}/search/asks/?order=${order}&limit=${limit}&q=${encodeURIComponent(JSON.stringify(params))}`;
+    // Vast.ai API v0 breaking change (2026-05): order and limit must now be inside the q JSON,
+    // not as separate URL params. order format changed to [["field", "dir"]] tuple array.
+    // Old (broken): ?order=dph_total+asc&limit=10&q=...
+    // New (working): ?q={"order":[["dph_total","asc"]],"limit":10,...}
+    const orderStr = query.order ?? 'dph_total asc';
+    const [orderField, orderDir = 'asc'] = orderStr.split(' ');
+    params['order'] = [[orderField, orderDir]];
+    params['limit'] = limit;
+
+    const url = `${this.baseUrl}/search/asks/?q=${encodeURIComponent(JSON.stringify(params))}`;
     const response = await this.request('GET', url, undefined, 'searchOffers');
 
     const data = response as { offers?: VastOffer[] };
