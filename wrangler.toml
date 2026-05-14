@@ -68,7 +68,7 @@ GEMINI_MODEL = "gemini-2.5-flash"
 PROMPT_BATCH_SIZE = "44"
 DIVERSITY_MODE = "soft"
 CONTROL_PLANE_URL = "https://video-platform.video-platform-m0559195631.workers.dev"
-VAST_EXCLUDED_MACHINES = "36773"   # CDI broken — container dies in <1 min
+VAST_EXCLUDED_MACHINES = "36773,79532"   # 36773=CDI broken; 79532=Docker Hub EOF (no registry access)
 
 # ── Secrets (set via `wrangler secret put <NAME>`) ───────────────────────────
 # Never add values here. These names are listed for documentation only:
