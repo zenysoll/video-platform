@@ -377,14 +377,37 @@ async function handleStreamDone(
     logger.warn('stream done: failed stuck rendering jobs', { stream_id: streamId, count: failedNow });
   }
 
-  // Always mark completed — /done from the worker is authoritative.
-  await env.DB
-    .prepare(`UPDATE streams SET state = 'completed', completed_at = ? WHERE id = ? AND state = 'running'`)
-    .bind(now, streamId)
-    .run();
-  logger.info('stream marked completed', { stream_id: streamId });
+  // Check for pending jobs that arrived after the worker's last poll.
+  // This happens on long-running streams where Gemini quota throttles prompt generation
+  // across multiple days — new prompts are inserted while the GPU is still rendering
+  // earlier ones. If pending jobs exist, destroy the instance but keep the stream
+  // 'running' so the reaper re-provisions a fresh instance.
+  const pendingCheck = await env.DB
+    .prepare(`SELECT COUNT(*) AS cnt FROM jobs WHERE stream_id = ? AND state = 'pending'`)
+    .bind(streamId)
+    .first<{ cnt: number }>();
+  const pendingCount = pendingCheck?.cnt ?? 0;
 
-  // Destroy Vast instance.
+  if (pendingCount > 0) {
+    // More jobs arrived — reset instance so reaper triggers re-provisioning.
+    await env.DB
+      .prepare(`UPDATE streams SET vast_instance_id = NULL WHERE id = ? AND state = 'running'`)
+      .bind(streamId)
+      .run();
+    logger.info('stream done: pending jobs remain, resetting for re-provision', {
+      stream_id: streamId,
+      pending_count: pendingCount,
+    });
+  } else {
+    // Truly finished — mark completed.
+    await env.DB
+      .prepare(`UPDATE streams SET state = 'completed', completed_at = ? WHERE id = ? AND state = 'running'`)
+      .bind(now, streamId)
+      .run();
+    logger.info('stream marked completed', { stream_id: streamId });
+  }
+
+  // Destroy Vast instance regardless (worker is exiting either way).
   if (instanceId) {
     try {
       const vast = new VastClient(env.VAST_API_KEY, env.VAST_API_BASE_URL);
