@@ -66,4 +66,10 @@ export interface Env {
    *  Create via CF Dashboard: R2 → Manage API Tokens → video-platform-models Object R/W. */
   R2_MODEL_KEY_ID?: string;
   R2_MODEL_SECRET?: string;
+  /**
+   * Comma-separated Vast.ai machine IDs to permanently exclude from offer selection.
+   * Use this to block known-broken hosts (e.g. CDI/GPU injection failures).
+   * Example: "36773,12345"
+   */
+  VAST_EXCLUDED_MACHINES?: string;
 }

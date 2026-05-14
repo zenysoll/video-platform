@@ -259,6 +259,17 @@ async function sweepErrorInstances(env: Env): Promise<number> {
       actual_status: status ?? 'gone',
     });
 
+    // Emit a prominent error so the operator can identify the broken machine and
+    // add its machine_id to VAST_EXCLUDED_MACHINES. The machine_id is not available
+    // from the instance status API response — look it up in the Vast.ai dashboard
+    // using the instance_id above, then add it to wrangler.toml [vars] and redeploy.
+    logger.error('reaper: CDI/GPU error on instance — ADD machine_id to VAST_EXCLUDED_MACHINES', {
+      stream_id: stream.id,
+      instance_id: instanceId,
+      actual_status: status ?? 'gone',
+      // machine_id not available here but visible in Vast.ai dashboard
+    });
+
     // Destroy the instance; ignore errors — it may already be gone.
     try {
       await vast.destroyInstance(instanceId);

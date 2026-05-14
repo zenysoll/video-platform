@@ -319,6 +319,12 @@ async function runProvisioning(
   const vast = new VastClient(env.VAST_API_KEY, env.VAST_API_BASE_URL);
   const gpuCount = stream.gpu_count ?? 1;
 
+  // Parse excluded machine IDs from env (comma-separated integers).
+  const excludedMachines = (env.VAST_EXCLUDED_MACHINES ?? '')
+    .split(',')
+    .map(s => parseInt(s.trim(), 10))
+    .filter(n => !isNaN(n) && n > 0);
+
   // Search: prefer RTX 5090, fall back to any GPU meeting minimums.
   // Exclude CN: local inet_down looks fast but R2 throughput from China is ~20 MB/s
   // (vs 150+ MB/s from US/EU), causing 2–3× slower cold starts.
@@ -330,6 +336,7 @@ async function runProvisioning(
     min_inet_down: GPU_MIN_INET_DOWN,
     num_gpus: gpuCount,
     excluded_countries: ['CN', 'KR'],  // CN: slow R2; KR: Vast infra docker_build errors
+    excluded_machine_ids: excludedMachines,
     order: 'dph_total asc',
     limit: 10,
   };

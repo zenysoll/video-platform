@@ -71,6 +71,12 @@ export interface VastSearchQuery {
    * throughput (~20 MB/s vs 150+ MB/s from US/EU), causing 2–3× longer cold starts.
    */
   excluded_countries?: string[];
+  /**
+   * Vast.ai machine IDs to exclude from offer selection — filtered client-side.
+   * Use to permanently block known-broken hosts (e.g. CDI/GPU injection failures).
+   * Populated from the VAST_EXCLUDED_MACHINES env var.
+   */
+  excluded_machine_ids?: number[];
   /** Sort expression, e.g. "dph_total asc" */
   order?: string;
   /** Maximum number of results (default: 20) */

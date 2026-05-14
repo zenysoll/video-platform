@@ -100,6 +100,16 @@ export class VastClient {
       });
     }
 
+    // Client-side machine exclusion for known-broken CDI hosts.
+    if (query.excluded_machine_ids && query.excluded_machine_ids.length > 0) {
+      const excluded = new Set(query.excluded_machine_ids);
+      offers = offers.filter(o => !excluded.has(o.machine_id));
+      logger.debug('vast offers after machine_id filter', {
+        excluded: query.excluded_machine_ids,
+        remaining: offers.length,
+      });
+    }
+
     return offers;
   }
 

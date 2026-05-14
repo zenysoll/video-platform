@@ -68,6 +68,7 @@ GEMINI_MODEL = "gemini-2.5-flash"
 PROMPT_BATCH_SIZE = "44"
 DIVERSITY_MODE = "soft"
 CONTROL_PLANE_URL = "https://video-platform.video-platform-m0559195631.workers.dev"
+VAST_EXCLUDED_MACHINES = "36773"   # CDI broken — container dies in <1 min
 
 # ── Secrets (set via `wrangler secret put <NAME>`) ───────────────────────────
 # Never add values here. These names are listed for documentation only:
