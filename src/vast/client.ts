@@ -179,6 +179,28 @@ export class VastClient {
   }
 
   /**
+   * Fetch only the actual_status field for a known instance.
+   *
+   * Returns null when the instance is gone (404) or the network call fails,
+   * so callers can treat null as "dead/gone" without an explicit error path.
+   *
+   * Intentionally no retries — used by the reaper where a transient null
+   * is safe (the instance will be checked again on the next reaper cycle).
+   */
+  async getInstanceStatus(instanceId: number): Promise<string | null> {
+    const url = `${this.baseUrl}/instances/${instanceId}/`;
+    try {
+      const response = await this.request('GET', url, undefined, 'getInstanceStatus');
+      const raw = response as { instances?: VastInstance | VastInstance[] };
+      const instance = Array.isArray(raw.instances) ? raw.instances[0] : raw.instances;
+      return (instance as { actual_status?: string } | undefined)?.actual_status ?? null;
+    } catch {
+      // Instance gone or network failure — treat as dead.
+      return null;
+    }
+  }
+
+  /**
    * Permanently destroy an instance.
    *
    * Uses DELETE (not stop). Stopped instances continue billing on Vast.ai.

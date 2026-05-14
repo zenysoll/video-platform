@@ -1,7 +1,7 @@
 /**
  * Cron reaper — runs every 15 minutes via Cloudflare scheduled trigger.
  *
- * Five sweeps per run:
+ * Six sweeps per run:
  *
  * 1. Stuck rendering jobs
  *    Jobs stuck in 'rendering' for > RENDER_TIMEOUT_MIN are reset to 'pending'
@@ -11,6 +11,12 @@
  *    Streams in 'running' state where all jobs are terminal (rendered/published/failed/cancelled)
  *    but the instance never sent the /done signal.
  *    → mark stream 'completed', destroy the Vast instance.
+ *
+ * 2b. Error instances (CDI/OCI failure — container never started)
+ *    Streams with a real numeric vast_instance_id, no work done (videos_rendered=0,
+ *    videos_failed=0), started > ERROR_INSTANCE_TIMEOUT_MIN ago.
+ *    The Vast.ai actual_status will be 'error'/'exited'/'created' (never 'running'/'loading').
+ *    → destroy instance, reset vast_instance_id to NULL so sweep 3 can retry provisioning.
  *
  * 3. Stuck provisioning (vast_instance_id = 'pending')
  *    Streams stuck in provisioning for > PROVISION_TIMEOUT_MIN (queue worker crashed/timed out).
@@ -46,20 +52,28 @@ const QUEUED_TIMEOUT_MIN = 5;
 /** Streams running longer than this trigger an alert log. */
 const STREAM_TIMEOUT_HOURS = 6;
 
+/**
+ * Streams with a real instance ID and no work done after this threshold are
+ * checked against the Vast.ai API. CDI/OCI failures keep actual_status as
+ * 'error' or 'created' indefinitely and never advance to 'running'.
+ */
+const ERROR_INSTANCE_TIMEOUT_MIN = 10;
+
 export async function runReaper(env: Env): Promise<void> {
   logger.info('reaper run started');
 
-  // Sweeps 1-5 run in parallel; sweep 6 (ghost alert) runs after for cleaner logging.
-  const [stuck, orphaned, provisioning, renderedStuck, queuedStuck] = await Promise.all([
+  // Sweeps 1-5 + 2b run in parallel; sweep 6 (ghost alert) runs after for cleaner logging.
+  const [stuck, orphaned, provisioning, renderedStuck, queuedStuck, errorInstances] = await Promise.all([
     sweepStuckRenderingJobs(env),
     sweepOrphanedInstances(env),
     sweepStuckProvisioning(env),
     sweepStuckRenderedJobs(env),
     sweepStuckQueuedStreams(env),
+    sweepErrorInstances(env),
   ]);
   const ghosts = await sweepGhostStreams(env);
 
-  logger.info('reaper run complete', { stuck, orphaned, provisioning, renderedStuck, queuedStuck, ghosts });
+  logger.info('reaper run complete', { stuck, orphaned, provisioning, renderedStuck, queuedStuck, errorInstances, ghosts });
 }
 
 // ── Sweep 1: stuck rendering jobs ────────────────────────────────────────────
@@ -186,6 +200,91 @@ async function sweepOrphanedInstances(env: Env): Promise<number> {
   }
 
   return destroyed;
+}
+
+// ── Sweep 2b: error instances (CDI/OCI failure, container never reached 'running') ──
+
+/**
+ * Detects streams whose Vast instance failed at the container-runtime level
+ * (e.g. CDI GPU injection error). These instances get stuck at actual_status='error'
+ * or remain at 'created' indefinitely — bootstrap.sh never runs, no signal is sent,
+ * and no jobs complete, so none of the other sweeps catch them.
+ *
+ * Idempotent: UPDATE uses a conditional WHERE clause on vast_instance_id so
+ * a duplicate invocation on an already-reset row is a safe no-op.
+ */
+async function sweepErrorInstances(env: Env): Promise<number> {
+  const cutoff = new Date(Date.now() - ERROR_INSTANCE_TIMEOUT_MIN * 60_000).toISOString();
+
+  // Streams with a real (numeric) instance ID, no rendered/failed work yet,
+  // and old enough that a healthy boot would have completed by now.
+  const candidates = await env.DB
+    .prepare(`
+      SELECT s.id, s.vast_instance_id
+      FROM streams s
+      WHERE s.state = 'running'
+        AND s.vast_instance_id IS NOT NULL
+        AND s.vast_instance_id != 'pending'
+        AND s.videos_rendered = 0
+        AND s.videos_failed = 0
+        AND s.started_at < ?
+    `)
+    .bind(cutoff)
+    .all<{ id: string; vast_instance_id: string }>();
+
+  if (!candidates.results.length) return 0;
+
+  logger.warn('reaper: checking instances for CDI/OCI error state', {
+    count: candidates.results.length,
+    cutoff,
+  });
+
+  const vast = new VastClient(env.VAST_API_KEY, env.VAST_API_BASE_URL);
+  let reset = 0;
+
+  for (const stream of candidates.results) {
+    const instanceId = parseInt(stream.vast_instance_id, 10);
+    if (isNaN(instanceId)) continue;
+
+    const status = await vast.getInstanceStatus(instanceId);
+
+    // Healthy states that should not be disturbed.
+    const isHealthy = status === 'running' || status === 'loading';
+    if (isHealthy) continue;
+
+    // Bad states: 'error', 'exited', 'created' (stuck), or null (instance gone).
+    logger.warn('reaper: instance in error/dead state — resetting stream for retry', {
+      stream_id: stream.id,
+      instance_id: instanceId,
+      actual_status: status ?? 'gone',
+    });
+
+    // Destroy the instance; ignore errors — it may already be gone.
+    try {
+      await vast.destroyInstance(instanceId);
+      logger.info('reaper: error instance destroyed', {
+        stream_id: stream.id,
+        instance_id: instanceId,
+      });
+    } catch (err) {
+      logger.warn('reaper: failed to destroy error instance (may already be gone)', {
+        stream_id: stream.id,
+        instance_id: instanceId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // Reset vast_instance_id to NULL so sweep 3 / the next provisioning cycle
+    // can claim this stream and retry. Conditional WHERE guards against races.
+    await env.DB
+      .prepare(`UPDATE streams SET vast_instance_id = NULL WHERE id = ? AND vast_instance_id = ?`)
+      .bind(stream.id, stream.vast_instance_id)
+      .run();
+
+    reset++;
+  }
+
+  return reset;
 }
 
 // ── Sweep 3: stuck provisioning ──────────────────────────────────────────────
