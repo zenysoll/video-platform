@@ -377,29 +377,42 @@ async function handleStreamDone(
     logger.warn('stream done: failed stuck rendering jobs', { stream_id: streamId, count: failedNow });
   }
 
-  // Check for pending jobs that arrived after the worker's last poll.
-  // This happens on long-running streams where Gemini quota throttles prompt generation
-  // across multiple days — new prompts are inserted while the GPU is still rendering
-  // earlier ones. If pending jobs exist, destroy the instance but keep the stream
-  // 'running' so the reaper re-provisions a fresh instance.
-  const pendingCheck = await env.DB
-    .prepare(`SELECT COUNT(*) AS cnt FROM jobs WHERE stream_id = ? AND state = 'pending'`)
-    .bind(streamId)
-    .first<{ cnt: number }>();
-  const pendingCount = pendingCheck?.cnt ?? 0;
+  // Determine if the stream is truly finished or if there are more jobs to process.
+  //
+  // Two cases where we must NOT mark completed:
+  //   1. Pending jobs exist in DB — new prompts arrived after the worker's last poll.
+  //   2. total_jobs_in_db < total_videos — Gemini is still generating prompts;
+  //      the GPU finished the current batch faster than prompts were created.
+  //      When /done arrives, pending=0 but 607 more jobs haven't been inserted yet.
+  const [pendingCheck, jobCountCheck, streamRow] = await Promise.all([
+    env.DB.prepare(`SELECT COUNT(*) AS cnt FROM jobs WHERE stream_id = ? AND state = 'pending'`)
+      .bind(streamId).first<{ cnt: number }>(),
+    env.DB.prepare(`SELECT COUNT(*) AS cnt FROM jobs WHERE stream_id = ?`)
+      .bind(streamId).first<{ cnt: number }>(),
+    env.DB.prepare(`SELECT total_videos FROM streams WHERE id = ?`)
+      .bind(streamId).first<{ total_videos: number }>(),
+  ]);
 
-  if (pendingCount > 0) {
-    // More jobs arrived — reset instance so reaper triggers re-provisioning.
+  const pendingCount = pendingCheck?.cnt ?? 0;
+  const totalJobsCreated = jobCountCheck?.cnt ?? 0;
+  const totalVideos = streamRow?.total_videos ?? 0;
+  const allPromptsGenerated = totalJobsCreated >= totalVideos;
+
+  if (pendingCount > 0 || !allPromptsGenerated) {
+    // More work remains — reset instance so reaper triggers re-provisioning.
     await env.DB
       .prepare(`UPDATE streams SET vast_instance_id = NULL WHERE id = ? AND state = 'running'`)
       .bind(streamId)
       .run();
-    logger.info('stream done: pending jobs remain, resetting for re-provision', {
+    logger.info('stream done: more work remains, resetting for re-provision', {
       stream_id: streamId,
       pending_count: pendingCount,
+      total_jobs_created: totalJobsCreated,
+      total_videos: totalVideos,
+      all_prompts_generated: allPromptsGenerated,
     });
   } else {
-    // Truly finished — mark completed.
+    // Truly finished — all prompts generated and all jobs rendered.
     await env.DB
       .prepare(`UPDATE streams SET state = 'completed', completed_at = ? WHERE id = ? AND state = 'running'`)
       .bind(now, streamId)
