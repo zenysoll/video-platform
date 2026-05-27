@@ -31,6 +31,14 @@
  * 5. Ghost streams (safety net)
  *    Streams in 'running' state started > STREAM_TIMEOUT_HOURS ago are logged as alerts.
  *    These need human investigation before auto-termination.
+ *
+ * 7. Stalled batch chains
+ *    Running streams where videos_queued < total_videos (not all prompt batches
+ *    were generated) AND no pending jobs remain. Happens when a Gemini transient
+ *    outage (429/503) exhausts all 5 CF Queues retries for a batch message → DLQ.
+ *    The "enqueue next batch" code in stream-consumer only runs on success, so
+ *    subsequent batches are silently lost. Re-enqueue the next missing batch so the
+ *    chain can resume once Gemini recovers.
  */
 
 import type { Env } from '../config/env.js';
@@ -53,6 +61,13 @@ const QUEUED_TIMEOUT_MIN = 5;
 const STREAM_TIMEOUT_HOURS = 6;
 
 /**
+ * Running streams where videos_queued < total_videos AND no pending jobs
+ * AND silent for this long are assumed to have a broken batch chain.
+ * Re-enqueue the next missing batch so the chain can resume.
+ */
+const BATCH_CHAIN_STALL_MIN = 30;
+
+/**
  * Streams with a real instance ID and no work done after this threshold are
  * checked against the Vast.ai API. CDI/OCI failures keep actual_status as
  * 'error' or 'created' indefinitely and never advance to 'running'.
@@ -62,18 +77,19 @@ const ERROR_INSTANCE_TIMEOUT_MIN = 10;
 export async function runReaper(env: Env): Promise<void> {
   logger.info('reaper run started');
 
-  // Sweeps 1-5 + 2b run in parallel; sweep 6 (ghost alert) runs after for cleaner logging.
-  const [stuck, orphaned, provisioning, renderedStuck, queuedStuck, errorInstances] = await Promise.all([
+  // Sweeps 1-5, 2b, 7 run in parallel; sweep 6 (ghost alert) runs after for cleaner logging.
+  const [stuck, orphaned, provisioning, renderedStuck, queuedStuck, errorInstances, stalledChains] = await Promise.all([
     sweepStuckRenderingJobs(env),
     sweepOrphanedInstances(env),
     sweepStuckProvisioning(env),
     sweepStuckRenderedJobs(env),
     sweepStuckQueuedStreams(env),
     sweepErrorInstances(env),
+    sweepStalledBatchChains(env),
   ]);
   const ghosts = await sweepGhostStreams(env);
 
-  logger.info('reaper run complete', { stuck, orphaned, provisioning, renderedStuck, queuedStuck, errorInstances, ghosts });
+  logger.info('reaper run complete', { stuck, orphaned, provisioning, renderedStuck, queuedStuck, errorInstances, stalledChains, ghosts });
 }
 
 // ── Sweep 1: stuck rendering jobs ────────────────────────────────────────────
@@ -145,6 +161,7 @@ async function sweepOrphanedInstances(env: Env): Promise<number> {
       WHERE s.state = 'running'
         AND s.vast_instance_id IS NOT NULL
         AND s.vast_instance_id != 'pending'
+        AND s.videos_queued >= s.total_videos
         AND NOT EXISTS (
           SELECT 1 FROM jobs j
           WHERE j.stream_id = s.id
@@ -490,6 +507,91 @@ async function sweepStuckQueuedStreams(env: Env): Promise<number> {
       });
     }
   }
+  return requeued;
+}
+
+// ── Sweep 7: stalled batch chains ────────────────────────────────────────────
+
+/**
+ * Detects running streams where the Gemini prompt-generation chain broke
+ * mid-stream — i.e. videos_queued < total_videos AND no pending jobs exist.
+ *
+ * Root cause: a CF Queues stream-launch message exhausts all max_retries (5)
+ * due to a Gemini 429/503 and goes to DLQ. The "enqueue next batch" step in
+ * stream-consumer runs AFTER generatePromptBatch returns (success path only).
+ * On DLQ the next batch message was never created, so seqs beyond that point
+ * are permanently lost unless repaired here.
+ *
+ * Fix: re-enqueue a fresh batch starting from seq_start = videos_queued + 1.
+ * The stream-consumer uses INSERT OR IGNORE so duplicate runs are safe.
+ * On the NEXT reaper cycle, Sweep 3 will re-provision GPU if needed
+ * (pending jobs now exist, vast_instance_id is NULL after /done reset).
+ *
+ * Idempotent: runs every 15 min. Extra re-enqueues on a still-throttled
+ * Gemini will hit DLQ again — each cycle retries until Gemini recovers.
+ */
+async function sweepStalledBatchChains(env: Env): Promise<number> {
+  const cutoff = new Date(Date.now() - BATCH_CHAIN_STALL_MIN * 60_000).toISOString();
+
+  // Running streams that:
+  //   • haven't generated all their videos yet (videos_queued < total_videos)
+  //   • have no pending jobs left (GPU already finished whatever existed)
+  //   • started long enough ago that normal in-flight batch processing is done
+  const stalled = await env.DB
+    .prepare(`
+      SELECT s.id, s.user_id, s.videos_queued, s.total_videos
+      FROM streams s
+      WHERE s.state = 'running'
+        AND s.videos_queued < s.total_videos
+        AND s.started_at < ?
+        AND NOT EXISTS (
+          SELECT 1 FROM jobs j
+          WHERE j.stream_id = s.id AND j.state = 'pending'
+        )
+    `)
+    .bind(cutoff)
+    .all<{ id: string; user_id: number; videos_queued: number; total_videos: number }>();
+
+  if (!stalled.results.length) return 0;
+
+  logger.warn('reaper: stalled batch chains detected', { count: stalled.results.length });
+
+  const batchSize = parseInt(env.PROMPT_BATCH_SIZE ?? '44', 10);
+  let requeued = 0;
+
+  for (const stream of stalled.results) {
+    const seqStart = stream.videos_queued + 1;
+    const remaining = stream.total_videos - stream.videos_queued;
+    const nextBatchSize = Math.min(remaining, batchSize);
+    // Use the approximate batch index (non-zero, non-99 to skip provisioning trigger
+    // in stream-consumer — Sweep 3 handles re-provisioning once pending jobs exist).
+    const batchIndex = Math.ceil(stream.videos_queued / batchSize);
+
+    logger.warn('reaper: re-enqueuing stalled batch chain', {
+      stream_id: stream.id,
+      videos_queued: stream.videos_queued,
+      total_videos: stream.total_videos,
+      seq_start: seqStart,
+      next_batch_size: nextBatchSize,
+    });
+
+    try {
+      await enqueueStreamLaunch(env.STREAM_QUEUE, {
+        stream_id: stream.id,
+        user_id: stream.user_id,
+        batch_index: batchIndex,
+        batch_size: nextBatchSize,
+        seq_start: seqStart,
+      });
+      requeued++;
+    } catch (err) {
+      logger.error('reaper: failed to re-enqueue stalled batch chain', {
+        stream_id: stream.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   return requeued;
 }
 
