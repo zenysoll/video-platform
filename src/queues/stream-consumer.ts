@@ -173,7 +173,12 @@ async function processStreamBatch(msg: StreamLaunchMessage, env: Env): Promise<v
 
   // Update stream counters + transition to 'running' BEFORE external calls.
   // This is the critical state machine step — must succeed even if queue sends fail.
-  const newQueued = stream.videos_queued + prompts.length;
+  //
+  // Use seq_start (from the message) instead of stream.videos_queued (from DB) so
+  // this calculation is idempotent: re-processing the same batch message twice
+  // (e.g. CF Queues duplicate delivery or Sweep 7 re-enqueue) yields the same
+  // newQueued value regardless of what the DB counter already shows.
+  const newQueued = seq_start - 1 + prompts.length;
   if (batch_index === 0) {
     await env.DB
       .prepare(`
@@ -192,8 +197,8 @@ async function processStreamBatch(msg: StreamLaunchMessage, env: Env): Promise<v
       .run();
   } else {
     await env.DB
-      .prepare('UPDATE streams SET videos_queued = ? WHERE id = ?')
-      .bind(newQueued, stream_id)
+      .prepare('UPDATE streams SET videos_queued = ? WHERE id = ? AND videos_queued < ?')
+      .bind(newQueued, stream_id, newQueued)
       .run();
   }
 
