@@ -39,12 +39,22 @@
  *    The "enqueue next batch" code in stream-consumer only runs on success, so
  *    subsequent batches are silently lost. Re-enqueue the next missing batch so the
  *    chain can resume once Gemini recovers.
+ *
+ * 8. Orphan Vast instances (money-leak safety net)
+ *    Lists ALL Vast instances owned by the account and destroys any that don't
+ *    match a currently-running stream's vast_instance_id and are older than the
+ *    provisioning grace window. Catches every leak path regardless of cause:
+ *    failed boots whose instance id was lost, cancelled/completed streams whose
+ *    instance survived, and re-provision loops that overwrote vast_instance_id and
+ *    left the previous instance billing forever. This is the last line of defence
+ *    for the GPU budget.
  */
 
 import type { Env } from '../config/env.js';
 import { VastClient } from '../vast/client.js';
 import { enqueueStreamLaunch } from '../queues/stream-producer.js';
 import { enqueuePublishJob } from '../queues/publish-producer.js';
+import { telegramCall } from '../telegram/types.js';
 import { logger } from '../lib/logger.js';
 import { nowIso } from '../lib/idempotency.js';
 
@@ -74,10 +84,44 @@ const BATCH_CHAIN_STALL_MIN = 30;
  */
 const ERROR_INSTANCE_TIMEOUT_MIN = 10;
 
+/**
+ * Grace period before the orphan sweep will destroy a Vast instance that doesn't
+ * match any running stream. Protects the race window in runProvisioning between
+ * startInstance() (instance exists on Vast) and the D1 UPDATE that records its id
+ * (a few seconds). Anything older than this with no owning running stream is a
+ * genuine money-leaking orphan and must die.
+ */
+const ORPHAN_INSTANCE_GRACE_MIN = 12;
+
+/**
+ * A running stream whose assigned instance has been up this long but produced NO
+ * render progress in this window is treated as a stalled host (bootstrap/worker
+ * died silently while the container stays 'running'). The instance is recycled.
+ * Generous enough to never touch a still-booting host (slow 55 GB download).
+ */
+const STALL_RECYCLE_MIN = 40;
+
+/**
+ * Absolute give-up: a stream that has been running this long AND is still both
+ * incomplete and not making render progress is marked 'failed' (and the user is
+ * notified). Bounds the worst case so nothing lingers for days. A progressing
+ * stream (recent renders) is NEVER force-failed, regardless of age.
+ */
+const STREAM_HARD_LIMIT_HOURS = 24;
+
+/**
+ * An instance still stuck in 'loading'/'created' (never reached 'running') after
+ * this long is recycled. Healthy hosts reach 'running' within a few minutes; a
+ * host stuck loading for 20+ min is broken (e.g. "Secrets fetch failed", a stuck
+ * Docker pull). Caught much faster than the 40-min alive-but-dead threshold.
+ */
+const LOADING_STUCK_MIN = 20;
+
 export async function runReaper(env: Env): Promise<void> {
   logger.info('reaper run started');
 
-  // Sweeps 1-5, 2b, 7 run in parallel; sweep 6 (ghost alert) runs after for cleaner logging.
+  // Sweeps 1-5, 2b, 7 run in parallel; sweep 6 (ghost alert) and sweep 8 (orphan
+  // Vast instances) run after so the orphan reconciliation sees the post-sweep DB state.
   const [stuck, orphaned, provisioning, renderedStuck, queuedStuck, errorInstances, stalledChains] = await Promise.all([
     sweepStuckRenderingJobs(env),
     sweepOrphanedInstances(env),
@@ -88,8 +132,15 @@ export async function runReaper(env: Env): Promise<void> {
     sweepStalledBatchChains(env),
   ]);
   const ghosts = await sweepGhostStreams(env);
+  // Recycle stalled hosts / hard give-up. Runs after the parallel batch so it sees
+  // post-sweep instance assignments (avoids racing sweep 2b on the same instance).
+  const stalled = await sweepStalledStreams(env);
+  // Run LAST: reconcile actual Vast instances against running streams. Running after
+  // the other sweeps ensures vast_instance_id resets/destroys have already landed, so
+  // this only kills true orphans.
+  const orphanInstances = await sweepOrphanVastInstances(env);
 
-  logger.info('reaper run complete', { stuck, orphaned, provisioning, renderedStuck, queuedStuck, errorInstances, stalledChains, ghosts });
+  logger.info('reaper run complete', { stuck, orphaned, provisioning, renderedStuck, queuedStuck, errorInstances, stalledChains, ghosts, stalled, orphanInstances });
 }
 
 // ── Sweep 1: stuck rendering jobs ────────────────────────────────────────────
@@ -225,7 +276,15 @@ async function sweepOrphanedInstances(env: Env): Promise<number> {
  * Detects streams whose Vast instance failed at the container-runtime level
  * (e.g. CDI GPU injection error). These instances get stuck at actual_status='error'
  * or remain at 'created' indefinitely — bootstrap.sh never runs, no signal is sent,
- * and no jobs complete, so none of the other sweeps catch them.
+ * so none of the other sweeps catch them.
+ *
+ * Covers two cases:
+ *   1. Fresh stream — instance assigned but nothing ever rendered (original case).
+ *   2. Recovery stream — partial render done, new instance assigned for the remainder,
+ *      but that new instance is broken. The old check (videos_rendered=0) missed this.
+ *
+ * Check: stream has a real instance AND pending jobs (work still to do) AND
+ * has been running long enough that a healthy boot would have completed.
  *
  * Idempotent: UPDATE uses a conditional WHERE clause on vast_instance_id so
  * a duplicate invocation on an already-reset row is a safe no-op.
@@ -233,7 +292,7 @@ async function sweepOrphanedInstances(env: Env): Promise<number> {
 async function sweepErrorInstances(env: Env): Promise<number> {
   const cutoff = new Date(Date.now() - ERROR_INSTANCE_TIMEOUT_MIN * 60_000).toISOString();
 
-  // Streams with a real (numeric) instance ID, no rendered/failed work yet,
+  // Streams with a real (numeric) instance ID, pending jobs remaining,
   // and old enough that a healthy boot would have completed by now.
   const candidates = await env.DB
     .prepare(`
@@ -242,9 +301,11 @@ async function sweepErrorInstances(env: Env): Promise<number> {
       WHERE s.state = 'running'
         AND s.vast_instance_id IS NOT NULL
         AND s.vast_instance_id != 'pending'
-        AND s.videos_rendered = 0
-        AND s.videos_failed = 0
         AND s.started_at < ?
+        AND EXISTS (
+          SELECT 1 FROM jobs j
+          WHERE j.stream_id = s.id AND j.state = 'pending'
+        )
     `)
     .bind(cutoff)
     .all<{ id: string; vast_instance_id: string }>();
@@ -264,6 +325,10 @@ async function sweepErrorInstances(env: Env): Promise<number> {
     if (isNaN(instanceId)) continue;
 
     const status = await vast.getInstanceStatus(instanceId);
+
+    // Transient API error → instance state is UNKNOWN. Never destroy on uncertainty;
+    // re-check next cycle. (Previously a blip returned null and killed a healthy host.)
+    if (status === 'unreachable') continue;
 
     // Healthy states that should not be disturbed.
     const isHealthy = status === 'running' || status === 'loading';
@@ -593,6 +658,222 @@ async function sweepStalledBatchChains(env: Env): Promise<number> {
   }
 
   return requeued;
+}
+
+// ── Sweep 9: stalled streams (recycle stuck host + hard give-up) ─────────────
+
+/**
+ * Catches two real-world failure modes that all other sweeps miss:
+ *
+ *   (a) "alive but dead" host — the container reaches actual_status='running' but
+ *       bootstrap/worker silently died (slow/failed model download, crash). Jobs
+ *       stay 'pending' (never 'rendering'), so sweeps 1/2b/8 all skip it and it
+ *       bills for days producing nothing. (This is the 7-day phantom we saw.)
+ *
+ *   (b) no terminal give-up — a stream that can never render loops forever via
+ *       sweep 3's re-provisioning; the ghost sweep only logs.
+ *
+ * Strategy (no DB migration — uses job timestamps + live instance age):
+ *   - Candidate: any running stream that still has pending jobs.
+ *   - HARD give-up: running > STREAM_HARD_LIMIT_HOURS AND incomplete AND no render
+ *     in the last STALL_RECYCLE_MIN → mark 'failed', notify user, destroy instance.
+ *     This is INSTANCE-INDEPENDENT: it must fire even when sweep 2b has already
+ *     nulled the dead instance (otherwise a perpetually re-provisioning stream
+ *     would never be given up on). A progressing stream is never force-failed.
+ *   - RECYCLE: a still-assigned instance up > STALL_RECYCLE_MIN with no render
+ *     progress → destroy + reset to NULL so sweep 3 re-provisions on a fresh host.
+ *     The live instance-age check protects a still-booting replacement.
+ */
+async function sweepStalledStreams(env: Env): Promise<number> {
+  const now = Date.now();
+  const recycleCutoff = new Date(now - STALL_RECYCLE_MIN * 60_000).toISOString();
+  const hardCutoff = new Date(now - STREAM_HARD_LIMIT_HOURS * 3_600_000).toISOString();
+
+  const candidates = await env.DB
+    .prepare(`
+      SELECT s.id, s.user_id, s.vast_instance_id, s.started_at,
+             s.total_videos, s.videos_rendered,
+             (SELECT MAX(j2.render_completed_at) FROM jobs j2 WHERE j2.stream_id = s.id) AS last_render,
+             (SELECT MAX(j3.render_started_at)   FROM jobs j3 WHERE j3.stream_id = s.id) AS last_start
+      FROM streams s
+      WHERE s.state = 'running'
+        AND EXISTS (SELECT 1 FROM jobs j WHERE j.stream_id = s.id AND j.state = 'pending')
+    `)
+    .all<{
+      id: string; user_id: number; vast_instance_id: string | null; started_at: string | null;
+      total_videos: number; videos_rendered: number;
+      last_render: string | null; last_start: string | null;
+    }>();
+
+  if (!candidates.results.length) return 0;
+
+  const vast = new VastClient(env.VAST_API_KEY, env.VAST_API_BASE_URL);
+  let acted = 0;
+
+  for (const s of candidates.results) {
+    // Instance may be a real id, 'pending', or NULL (sweep 2b/3 mid-cycle).
+    const instanceId = s.vast_instance_id && s.vast_instance_id !== 'pending'
+      ? parseInt(s.vast_instance_id, 10) : NaN;
+    const hasInstance = !isNaN(instanceId);
+
+    // Most recent render activity (claim or completion). null → never rendered.
+    const lastActivity = [s.last_render, s.last_start].filter(Boolean).sort().at(-1) ?? null;
+    const noRecentProgress = !lastActivity || lastActivity < recycleCutoff;
+
+    // ── HARD give-up: old, incomplete, not progressing — fires regardless of
+    //    instance state so a re-provisioning loop is eventually stopped. ────────
+    if (
+      s.started_at && s.started_at < hardCutoff &&
+      s.videos_rendered < s.total_videos &&
+      noRecentProgress
+    ) {
+      logger.error('reaper: stream hard give-up — failing after limit', {
+        stream_id: s.id, started_at: s.started_at,
+        rendered: s.videos_rendered, total: s.total_videos,
+      });
+      await env.DB
+        .prepare(`UPDATE streams SET state='failed', completed_at=? WHERE id=? AND state='running'`)
+        .bind(nowIso(), s.id)
+        .run();
+      if (hasInstance) { try { await vast.destroyInstance(instanceId); } catch { /* may be gone */ } }
+      await notifyUser(env, s.user_id,
+        `⚠️ Stream stopped: no render progress after ${STREAM_HARD_LIMIT_HOURS}h. ` +
+        `${s.videos_rendered}/${s.total_videos} videos were published. ` +
+        `You can start a new stream to retry the rest.`);
+      acted++;
+      continue;
+    }
+
+    if (!noRecentProgress) continue;  // actively rendering — leave it alone
+    if (!hasInstance) continue;        // no live instance to recycle (sweep 3 provisions)
+
+    // ── RECYCLE: only if the instance itself has been up long enough ──────────
+    // (protects a freshly re-provisioned replacement that is still booting).
+    let instanceAgeMin = Infinity;
+    let actualStatus = '';
+    try {
+      const inst = await vast.getInstance(instanceId);
+      if (inst.start_date) instanceAgeMin = (now / 1000 - inst.start_date) / 60;
+      actualStatus = inst.actual_status ?? '';
+    } catch {
+      // Instance not found / unreachable — let sweep 2b/8 handle it, skip here.
+      continue;
+    }
+
+    // Two recycle triggers:
+    //   • STUCK LOADING — never reached 'running' (e.g. "Secrets fetch failed",
+    //     stuck Docker pull). Caught at LOADING_STUCK_MIN (~20m), well before the
+    //     slower alive-but-dead threshold.
+    //   • ALIVE BUT DEAD — reached 'running' but no render progress for 40m+.
+    const stuckLoading = (actualStatus === 'loading' || actualStatus === 'created')
+      && instanceAgeMin >= LOADING_STUCK_MIN;
+    const aliveButDead = actualStatus === 'running' && instanceAgeMin >= STALL_RECYCLE_MIN;
+    if (!stuckLoading && !aliveButDead) continue; // still booting / progressing — protect
+
+    logger.error('reaper: stalled host — recycling instance', {
+      stream_id: s.id, instance_id: instanceId, actual_status: actualStatus,
+      reason: stuckLoading ? 'stuck-loading' : 'alive-but-dead',
+      instance_age_min: Math.round(instanceAgeMin), last_activity: lastActivity ?? 'never',
+    });
+    try { await vast.destroyInstance(instanceId); } catch { /* may be gone */ }
+    await env.DB
+      .prepare(`UPDATE streams SET vast_instance_id=NULL WHERE id=? AND vast_instance_id=?`)
+      .bind(s.id, s.vast_instance_id)
+      .run();
+    acted++;
+  }
+
+  return acted;
+}
+
+/** Best-effort Telegram DM to the operator (never throws into the reaper). */
+async function notifyUser(env: Env, userId: number, text: string): Promise<void> {
+  try {
+    await telegramCall('sendMessage', { chat_id: userId, text }, env.CONTROL_BOT_TOKEN);
+  } catch (err) {
+    logger.warn('reaper: user notify failed', {
+      user_id: userId, error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+// ── Sweep 8: orphan Vast instances (money-leak safety net) ───────────────────
+
+/**
+ * Destroys any Vast instance that is billing but not tied to a running stream.
+ *
+ * The "protected" set is the numeric vast_instance_id of every stream currently
+ * in 'running' state. Any owned instance NOT in that set — and older than the
+ * provisioning grace window — is an orphan and is destroyed.
+ *
+ * Why this is needed: the per-stream destroy paths (provision-failed, /done,
+ * sweep 2/2b) can all miss an instance if its id is unknown (worker reported 0)
+ * or if vast_instance_id was overwritten by a re-provision before the old
+ * instance was killed. This sweep closes every gap by reconciling the actual
+ * Vast.ai instance list against the DB, so no instance can bill indefinitely.
+ *
+ * Safety: instances younger than ORPHAN_INSTANCE_GRACE_MIN are never touched,
+ * protecting the brief window between startInstance() and the DB id write.
+ */
+async function sweepOrphanVastInstances(env: Env): Promise<number> {
+  const vast = new VastClient(env.VAST_API_KEY, env.VAST_API_BASE_URL);
+  const instances = await vast.listInstances();
+  if (!instances.length) return 0;
+
+  // Protected set: instance ids of all currently-running streams.
+  const runningRows = await env.DB
+    .prepare(`
+      SELECT vast_instance_id FROM streams
+      WHERE state = 'running'
+        AND vast_instance_id IS NOT NULL
+        AND vast_instance_id != 'pending'
+    `)
+    .all<{ vast_instance_id: string }>();
+
+  const protectedIds = new Set<number>();
+  for (const r of runningRows.results) {
+    const id = parseInt(r.vast_instance_id, 10);
+    if (!isNaN(id)) protectedIds.add(id);
+  }
+
+  const graceCutoffSecs = Math.floor(Date.now() / 1000) - ORPHAN_INSTANCE_GRACE_MIN * 60;
+  let destroyed = 0;
+
+  for (const inst of instances) {
+    if (protectedIds.has(inst.id)) continue;
+
+    // Protect freshly-created instances (provisioning race window). When start_date
+    // is missing, treat as old enough to act on — a long-lived instance with no
+    // start_date is still a leak.
+    const startSecs = inst.start_date ?? 0;
+    if (startSecs > graceCutoffSecs) {
+      logger.info('orphan sweep: skipping young unmatched instance (grace window)', {
+        instance_id: inst.id,
+        label: inst.label,
+        age_secs: startSecs ? Math.floor(Date.now() / 1000) - startSecs : null,
+      });
+      continue;
+    }
+
+    logger.error('orphan sweep: destroying orphan Vast instance (not tied to any running stream)', {
+      instance_id: inst.id,
+      label: inst.label,
+      actual_status: inst.actual_status,
+      dph_total: inst.dph_total,
+    });
+
+    try {
+      await vast.destroyInstance(inst.id);
+      destroyed++;
+    } catch (err) {
+      logger.warn('orphan sweep: destroy failed (may already be gone)', {
+        instance_id: inst.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return destroyed;
 }
 
 // ── Sweep 6: ghost streams (alert only) ──────────────────────────────────────

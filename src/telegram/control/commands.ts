@@ -54,16 +54,31 @@ export async function handleStreamsCommand(chatId: number, userId: number, env: 
     }, env.CONTROL_BOT_TOKEN);
   }
 
-  // Show other streams as a list.
-  const nonDraft = streams.filter(s => s.state !== 'draft');
-  if (nonDraft.length > 0) {
-    const lines = nonDraft.map(s => {
-      const progress = `${s.videos_published}/${s.total_videos} published`;
-      return `• ${s.name}  [${s.state}]  ${progress}`;
-    });
+  // Active streams (running/queued) — show each with a Kill button so the operator
+  // can stop them right here, not only from /status.
+  const active = streams.filter(s => s.state === 'running' || s.state === 'queued');
+  for (const s of active) {
+    const progress = `${s.videos_published}/${s.total_videos} published · rendered ${s.videos_rendered}`;
     await telegramCall('sendMessage', {
       chat_id: chatId,
-      text: `Streams:\n\n${lines.join('\n')}`,
+      text: `${s.name}  [${s.state}]\n${progress}`,
+      reply_markup: {
+        inline_keyboard: [[
+          { text: `⛔ Kill "${s.name}"`, callback_data: `stream:kill:${s.id}` },
+        ]],
+      },
+    }, env.CONTROL_BOT_TOKEN);
+  }
+
+  // Finished streams (completed/failed/cancelled) — compact list, no buttons.
+  const finished = streams.filter(s =>
+    s.state === 'completed' || s.state === 'failed' || s.state === 'cancelled');
+  if (finished.length > 0) {
+    const lines = finished.map(s =>
+      `• ${s.name}  [${s.state}]  ${s.videos_published}/${s.total_videos} published`);
+    await telegramCall('sendMessage', {
+      chat_id: chatId,
+      text: `Finished:\n\n${lines.join('\n')}`,
     }, env.CONTROL_BOT_TOKEN);
   }
 }

@@ -18,7 +18,8 @@
 import type { Env } from '../../config/env.js';
 import { telegramCall, type TelegramCallbackQuery, type TelegramMessage } from '../types.js';
 import { loadSession, saveSession, resetToIdle, type WizardData, type WizardStep } from './session.js';
-import { getBucketsForUser, insertBucket, activateBucket, deactivateBucket, insertStream } from '../../db/queries.js';
+import { getBucketsForUser, insertBucket, activateBucket, deactivateBucket, insertStream, transitionStreamToQueued } from '../../db/queries.js';
+import { enqueueStreamLaunch } from '../../queues/stream-producer.js';
 import { generateId } from '../../lib/idempotency.js';
 import { R2Client } from '../../r2/client.js';
 import { logger } from '../../lib/logger.js';
@@ -570,11 +571,29 @@ async function handleConfirmLaunch(
     gpuCount: data.gpu_count ?? 1,
   });
 
+  // Launch immediately — the "Launch" button must actually queue the stream, not
+  // just leave it as a draft. Previously this only inserted the draft and lied
+  // ("Queuing will start shortly"), forcing a second manual Launch from the stream
+  // list and leaving phantom drafts. Transition + enqueue exactly like the
+  // draft-list Launch path (handleStreamLaunch).
+  await transitionStreamToQueued(env.DB, streamId);
+  const batchSize = Math.min(
+    data.total_videos,
+    parseInt(env.PROMPT_BATCH_SIZE ?? '20', 10),
+  );
+  await enqueueStreamLaunch(env.STREAM_QUEUE, {
+    stream_id: streamId,
+    user_id: userId,
+    batch_index: 0,
+    batch_size: batchSize,
+    seq_start: 1,
+  });
+
   await resetToIdle(env.DB, userId);
 
-  logger.info('stream created', { stream_id: streamId, user_id: userId, name: data.name });
+  logger.info('stream created and launched', { stream_id: streamId, user_id: userId, name: data.name });
 
-  const confirmText = `Stream "${data.name}" saved.\n\nID: ${streamId.slice(0, 8)}...\n\nQueuing will start shortly.`;
+  const confirmText = `Stream "${data.name}" launched.\n\nID: ${streamId.slice(0, 8)}...\n\nGenerating ${data.total_videos} prompts and queueing render jobs.`;
   if (messageId) {
     await telegramCall('editMessageText', {
       chat_id: chatId, message_id: messageId, text: confirmText,

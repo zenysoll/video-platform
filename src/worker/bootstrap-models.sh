@@ -208,7 +208,7 @@ LOG "All workers finished."
 
 # ── Done signal → control plane destroys instance ─────────────────────────────
 LOG "Sending done signal..."
-INSTANCE_ID=$(cat /etc/vast_instance_id 2>/dev/null || echo 0)
+INSTANCE_ID="${CONTAINER_ID:-$(cat /etc/vast_instance_id 2>/dev/null || echo 0)}"
 curl -sf -X POST "${CONTROL_PLANE_URL}/worker/streams/${STREAM_ID}/done" \
   -H "Authorization: Bearer ${WORKER_SECRET}" \
   -H "Content-Type: application/json" \

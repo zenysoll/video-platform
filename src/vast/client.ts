@@ -68,6 +68,15 @@ export class VastClient {
       // inet_down is in Mbps (e.g. 500 = 500 Mbps ≈ 60 MB/s)
       params['inet_down'] = { gte: query.min_inet_down };
     }
+    if (query.verified) {
+      // Verified hosts only — eliminates unverified/deverified hosts that cause
+      // the bulk of "failed to inject CDI devices" / OCI-runtime container failures.
+      params['verified'] = { eq: true };
+    }
+    if (query.min_cuda_max_good !== undefined) {
+      // Highest CUDA version the host driver supports — ensures cu128/sm_120 capable.
+      params['cuda_max_good'] = { gte: query.min_cuda_max_good };
+    }
     if (query.num_gpus !== undefined) {
       params['num_gpus'] = { eq: query.num_gpus };
     }
@@ -103,11 +112,26 @@ export class VastClient {
     // Client-side machine exclusion for known-broken CDI hosts.
     if (query.excluded_machine_ids && query.excluded_machine_ids.length > 0) {
       const excluded = new Set(query.excluded_machine_ids);
-      offers = offers.filter(o => !excluded.has(o.machine_id));
+      offers = offers.filter(o => o.machine_id === undefined || !excluded.has(o.machine_id));
       logger.debug('vast offers after machine_id filter', {
         excluded: query.excluded_machine_ids,
         remaining: offers.length,
       });
+    }
+
+    // Client-side verification safety net: even though `verified: {eq:true}` is sent
+    // server-side, drop any non-'verified' offer defensively (e.g. if the API ever
+    // changes behaviour). 'deverified' hosts in particular failed re-verification and
+    // are the most likely to throw CDI/OCI container errors.
+    if (query.verified) {
+      const before = offers.length;
+      offers = offers.filter(o => o.verification === undefined || o.verification === 'verified');
+      if (offers.length !== before) {
+        logger.debug('vast offers after client-side verified filter', {
+          dropped: before - offers.length,
+          remaining: offers.length,
+        });
+      }
     }
 
     return offers;
@@ -191,11 +215,16 @@ export class VastClient {
   /**
    * Fetch only the actual_status field for a known instance.
    *
-   * Returns null when the instance is gone (404) or the network call fails,
-   * so callers can treat null as "dead/gone" without an explicit error path.
+   * Returns:
+   *   - the actual_status string (e.g. 'running','loading','error','created') when found
+   *   - `null` ONLY when the instance is definitively GONE (404 / empty response)
+   *   - `'unreachable'` on a transient error (network failure, 5xx) — the instance
+   *     state is UNKNOWN, so the caller must NOT treat it as dead and destroy it.
    *
-   * Intentionally no retries — used by the reaper where a transient null
-   * is safe (the instance will be checked again on the next reaper cycle).
+   * This distinction matters: a transient Vast.ai API blip previously returned null,
+   * which made the reaper destroy a perfectly healthy, working instance.
+   *
+   * Intentionally no retries — the reaper re-checks on the next cycle.
    */
   async getInstanceStatus(instanceId: number): Promise<string | null> {
     const url = `${this.baseUrl}/instances/${instanceId}/`;
@@ -203,10 +232,41 @@ export class VastClient {
       const response = await this.request('GET', url, undefined, 'getInstanceStatus');
       const raw = response as { instances?: VastInstance | VastInstance[] };
       const instance = Array.isArray(raw.instances) ? raw.instances[0] : raw.instances;
+      // Found the instance → real status. Not in response → genuinely gone (null).
       return (instance as { actual_status?: string } | undefined)?.actual_status ?? null;
-    } catch {
-      // Instance gone or network failure — treat as dead.
-      return null;
+    } catch (err) {
+      // 404 → instance is genuinely gone → null (safe to reset/recycle).
+      // Anything else (network error status 0, 5xx, timeout) → UNKNOWN, do not act.
+      const status = err instanceof VastApiError ? err.status : -1;
+      if (status === 404) return null;
+      logger.warn('getInstanceStatus transient error — reporting unreachable (will not destroy)', {
+        instance_id: instanceId,
+        status,
+      });
+      return 'unreachable';
+    }
+  }
+
+  /**
+   * List all instances owned by this account.
+   *
+   * Used by the orphan reaper to find Vast instances that are billing but are no
+   * longer tied to any running stream (the ultimate money-leak safety net).
+   *
+   * Returns [] on any error — the reaper treats an empty list as "nothing to clean"
+   * and will try again next cycle, rather than risk acting on a partial failure.
+   */
+  async listInstances(): Promise<VastInstance[]> {
+    const url = `${this.baseUrl}/instances/`;
+    try {
+      const response = await this.request('GET', url, undefined, 'listInstances');
+      const raw = response as { instances?: VastInstance[] };
+      return Array.isArray(raw.instances) ? raw.instances : [];
+    } catch (err) {
+      logger.warn('listInstances failed — treating as empty', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
     }
   }
 

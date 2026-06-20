@@ -130,6 +130,18 @@ export default {
       return new Response(text, { headers: { 'Content-Type': 'application/json' } });
     }
 
+    // POST /debug/run-reaper — run all reaper sweeps once, on demand (Bearer auth).
+    // Lets us test sweep behaviour deterministically instead of waiting for the cron.
+    if (path === '/debug/run-reaper' && request.method === 'POST') {
+      if (!verifyWorkerAuth(request, env.WORKER_SECRET)) return unauthorizedResponse();
+      try {
+        await runReaper(env);
+        return Response.json({ ok: true, ran_at: new Date().toISOString() });
+      } catch (err) {
+        return Response.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+      }
+    }
+
     // Debug: Vast.ai offer search — Bearer auth required.
     if (path === '/debug/vast-search' && request.method === 'GET') {
       if (!verifyWorkerAuth(request, env.WORKER_SECRET)) return unauthorizedResponse();

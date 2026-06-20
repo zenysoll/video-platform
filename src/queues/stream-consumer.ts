@@ -38,7 +38,8 @@ const GPU_MIN_VRAM_GB = 30;          // RTX 5090 = 32 GB; 30 gives safety margin
 const GPU_MIN_RAM_GB = 48;           // system RAM — use 48 so cheapest RTX 5090 (cpu_ram≈64 GB reported as ~64009 MB) passes the filter
 const GPU_MIN_DISK_GB = 120;         // 46 GB model + 9 GB Gemma + ComfyUI + workspace buffer (reduced from 200 — image pre-installs ComfyUI)
 const GPU_MIN_RELIABILITY = 0.98;   // reliability2 score 0–1. 0.98+ filters out worst hosts while keeping cheap US supply
-const GPU_MIN_INET_DOWN = 500;       // 500 Mbps ≈ 60 MB/s — ensures 46 GB model loads in <15 min; filters slow/Chinese datacenter instances
+const GPU_MIN_INET_DOWN = 1500;      // 1500 Mbps ≈ 190 MB/s — filters slow hosts (was 500: let in 525-790 Mbps hosts that made the 55 GB download crawl). Verified supply stays ~37 offers at this floor.
+const GPU_MIN_CUDA_MAX_GOOD = 12.8;  // host driver must support CUDA ≥12.8 (cu128 / Blackwell sm_120). All current RTX 5090 hosts pass; future-proofs against old-driver hosts.
 const GPU_PREFERRED = 'RTX 5090';   // Vast.ai uses spaces in GPU names
 
 // Pre-built image with PyTorch nightly cu128, ComfyUI + LTXVideo + VideoHelperSuite.
@@ -93,7 +94,7 @@ async function processStreamBatch(msg: StreamLaunchMessage, env: Env): Promise<v
     return;
   }
 
-  if (stream.state === 'completed' || stream.state === 'cancelled') {
+  if (stream.state === 'completed' || stream.state === 'cancelled' || stream.state === 'failed') {
     logger.info('stream already finished, skipping batch', { stream_id, state: stream.state });
     return;
   }
@@ -282,10 +283,15 @@ async function provisionVastInstance(
     return;
   }
 
-  // 'pending' → a previous invocation is in progress or crashed.
-  // We proceed anyway — the CAS UPDATE below is the true lock.
-  // If another worker is actively provisioning, the CAS UPDATE will match 0 rows
-  // and we'll exit early below.
+  if (currentId === 'pending') {
+    // A previous invocation is already provisioning. Don't create a second instance.
+    // If it crashed without updating the DB, Sweep 3 (reaper) resets 'pending' → NULL
+    // after PROVISION_TIMEOUT_MIN and retries cleanly.
+    logger.info('provisioning already in progress (pending), skipping to avoid duplicate instance', {
+      stream_id: streamId,
+    });
+    return;
+  }
 
   // ── Atomic claim: only one worker provisions at a time ───────────────────────
   // Use a CAS (compare-and-swap) pattern: only update if still NULL or 'pending'.
@@ -333,12 +339,20 @@ async function runProvisioning(
   // Search: prefer RTX 5090, fall back to any GPU meeting minimums.
   // Exclude CN: local inet_down looks fast but R2 throughput from China is ~20 MB/s
   // (vs 150+ MB/s from US/EU), causing 2–3× slower cold starts.
+  //
+  // verified:true is the key reliability filter — Vast.ai-verified hosts pass an
+  // automated GPU-container check, so they almost never throw "failed to inject CDI
+  // devices" / OCI-runtime errors. Measured: ~half of RTX 5090 offers are unverified
+  // or deverified (the CDI culprits); filtering them out costs no price premium and
+  // still leaves 25-30 offers for 1/2/4-GPU.
   const baseQuery = {
     min_gpu_ram: GPU_MIN_VRAM_GB,
     min_cpu_ram: GPU_MIN_RAM_GB,   // system RAM doesn't scale with GPU count — it's one machine
     min_disk_space: GPU_MIN_DISK_GB,
     min_reliability: GPU_MIN_RELIABILITY,
     min_inet_down: GPU_MIN_INET_DOWN,
+    min_cuda_max_good: GPU_MIN_CUDA_MAX_GOOD,
+    verified: true,
     num_gpus: gpuCount,
     excluded_countries: ['CN', 'KR'],  // CN: slow R2; KR: Vast infra docker_build errors
     excluded_machine_ids: excludedMachines,
@@ -348,11 +362,22 @@ async function runProvisioning(
 
   logger.info('searching Vast.ai GPU offers', { stream_id: streamId, gpu_count: gpuCount });
 
+  // Tier 1: verified RTX 5090.
   let offers = await vast.searchOffers({ ...baseQuery, gpu_name: GPU_PREFERRED });
 
+  // Tier 2: verified, any GPU meeting minimums.
   if (offers.length === 0) {
-    logger.warn('no RTX 5090 available, searching fallback GPUs', { stream_id: streamId, gpu_count: gpuCount });
+    logger.warn('no verified RTX 5090 available, searching verified fallback GPUs', { stream_id: streamId, gpu_count: gpuCount });
     offers = await vast.searchOffers(baseQuery);
+  }
+
+  // Tier 3 (last resort): RTX 5090 WITHOUT the verified requirement. Only reached when
+  // verified supply is momentarily exhausted — better than deadlocking the stream. An
+  // unverified host that CDI-fails is now cheap: bootstrap fast-fails → provision-failed
+  // destroys it immediately (Fix), and the reaper orphan sweep is the final backstop.
+  if (offers.length === 0) {
+    logger.warn('no verified offers at all — last-resort unverified RTX 5090 search', { stream_id: streamId, gpu_count: gpuCount });
+    offers = await vast.searchOffers({ ...baseQuery, verified: false, gpu_name: GPU_PREFERRED });
   }
 
   if (offers.length === 0) {

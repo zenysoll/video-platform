@@ -64,19 +64,24 @@ if [ ! -d "$VHS_NODE_DIR" ]; then
   pip install -q -r "$VHS_NODE_DIR/requirements.txt" 2>/dev/null || true
 fi
 
-# ── CRITICAL: install PyTorch nightly cu128 LAST — must run after all ─────────
-# requirements.txt installs. ComfyUI/LTXVideo requirements contain bare `torch`
-# which pip resolves to latest stable cu126. cu126 does NOT include sm_120 kernels
-# (RTX 5090 / Blackwell architecture) → "no kernel image" CUDA error at inference.
-# Installing nightly LAST ensures it overrides any stable torch from requirements.
-LOG "Installing PyTorch nightly cu128 (RTX 5090 / sm_120 required)..."
-pip install -q --pre --upgrade \
-  torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+# ── CRITICAL: install PyTorch cu128 LAST — must run after all requirements ────
+# The base image ships torch 2.6.0+cu126, and ComfyUI/LTXVideo requirements pin
+# bare `torch` (stable cu126). cu126 has NO sm_120 kernels (RTX 5090 / Blackwell)
+# → "no kernel image is available" at inference.
+#
+# Previously this used `--pre --upgrade ... nightly/cu128`, but `--upgrade` often
+# found no newer version on the nightly index and SILENTLY kept 2.6.0+cu126 — the
+# instance then passed the (too-lax) CUDA check and only died mid-render. Use a
+# FORCE-REINSTALL from the STABLE cu128 channel (torch ≥2.7 ships sm_120) so the
+# result is deterministic regardless of what the base image / requirements left.
+LOG "Installing PyTorch cu128 (RTX 5090 / sm_120 required, force-reinstall)..."
+pip install -q --force-reinstall \
+  torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 LOG "PyTorch version: $(python3 -c 'import torch; print(torch.__version__)')"
 
 # ── Verify CUDA is accessible (fast-fail before 55 GB model download) ─────────
 LOG "Verifying CUDA access..."
-INSTANCE_ID=$(cat /etc/vast_instance_id 2>/dev/null || echo 0)
+INSTANCE_ID="${CONTAINER_ID:-$(cat /etc/vast_instance_id 2>/dev/null || echo 0)}"
 
 if ! python3 -c "
 import torch, sys, os
@@ -88,12 +93,23 @@ visible = torch.cuda.device_count()
 if visible < gpu_count:
     print(f'Only {visible} GPU(s) visible, need {gpu_count}')
     sys.exit(1)
+# torch.cuda.is_available() is a FALSE POSITIVE on Blackwell with a cu126 build:
+# it returns True even when the GPU's sm_NN kernels are missing, so inference later
+# dies with 'no kernel image'. Verify the device's compute capability is in the
+# torch compiled arch list so a wrong-CUDA torch fails fast HERE, before the 55 GB
+# model download and before any render is attempted.
+cap = torch.cuda.get_device_capability(0)
+cap_str = f'sm_{cap[0]}{cap[1]}'
+arch_list = torch.cuda.get_arch_list()
+if cap_str not in arch_list:
+    print(f'{cap_str} not in torch arch list {arch_list}')
+    sys.exit(1)
 " 2>/dev/null; then
-  LOG "FATAL: CUDA check failed (not available or insufficient GPU count for GPU_COUNT=${GPU_COUNT:-1})."
+  LOG "FATAL: CUDA check failed (unavailable, too few GPUs, or torch missing sm_NN kernels for this GPU)."
   LOG "  nvidia-smi output:"
   nvidia-smi 2>&1 | head -5 || true
   LOG "  torch.cuda check:"
-  python3 -c "import torch, os; print('cuda:', torch.cuda.is_available(), 'devices:', torch.cuda.device_count(), 'need:', os.environ.get('GPU_COUNT','1'))" 2>&1 || true
+  python3 -c "import torch, os; print('torch:', torch.__version__, 'cuda:', torch.cuda.is_available(), 'devices:', torch.cuda.device_count(), 'cap:', torch.cuda.get_device_capability(0) if torch.cuda.is_available() else None, 'arch_list:', torch.cuda.get_arch_list())" 2>&1 || true
   LOG "Sending provision-failed signal — reaper will retry on a different host."
   curl -sf -X POST "${CONTROL_PLANE_URL}/worker/streams/${STREAM_ID}/provision-failed" \
     -H "Authorization: Bearer ${WORKER_SECRET}" \
@@ -347,7 +363,7 @@ LOG "All workers finished."
 
 # ── Done signal + cleanup ─────────────────────────────────────────────────────
 LOG "Worker finished. Sending done signal to control plane."
-INSTANCE_ID=$(cat /etc/vast_instance_id 2>/dev/null || echo 0)
+INSTANCE_ID="${CONTAINER_ID:-$(cat /etc/vast_instance_id 2>/dev/null || echo 0)}"
 curl -sf -X POST "${CONTROL_PLANE_URL}/worker/streams/${STREAM_ID}/done" \
   -H "Authorization: Bearer ${WORKER_SECRET}" \
   -H "Content-Type: application/json" \

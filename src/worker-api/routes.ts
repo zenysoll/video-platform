@@ -91,34 +91,34 @@ async function handleJobClaim(request: Request, env: Env): Promise<Response> {
     return Response.json({ error: 'stream not found' }, { status: 404 });
   }
 
-  // Claim next pending job atomically.
-  // SQLite serialises writes — this is safe without explicit transactions in D1.
+  // Claim next pending job ATOMICALLY in a single statement.
+  // The previous SELECT-then-UPDATE was a check-then-act race: with multiple GPU
+  // workers (2×/4×) two could SELECT the same pending row and both render it. Here
+  // the UPDATE selects the next pending row in a subquery and flips it in one write;
+  // SQLite serialises writes, so concurrent claims each get a DISTINCT row (the
+  // second statement's subquery re-evaluates after the first commits). RETURNING
+  // gives us the claimed row only if this worker actually won it.
   const job = await env.DB
-    .prepare(`
-      SELECT id, prompt_text, sequence_num FROM jobs
-      WHERE stream_id = ? AND state = 'pending'
-      ORDER BY sequence_num ASC LIMIT 1
-    `)
-    .bind(streamId)
-    .first<{ id: string; prompt_text: string; sequence_num: number }>();
-
-  if (!job) {
-    // No more pending jobs.
-    return new Response(null, { status: 204 });
-  }
-
-  // Transition to 'rendering'.
-  await env.DB
     .prepare(`
       UPDATE jobs
       SET state = 'rendering',
           vast_instance_id = ?,
           render_started_at = ?,
           render_attempts = render_attempts + 1
-      WHERE id = ? AND state = 'pending'
+      WHERE id = (
+        SELECT id FROM jobs
+        WHERE stream_id = ? AND state = 'pending'
+        ORDER BY sequence_num ASC LIMIT 1
+      ) AND state = 'pending'
+      RETURNING id, prompt_text, sequence_num
     `)
-    .bind(instanceId ?? null, nowIso(), job.id)
-    .run();
+    .bind(instanceId ?? null, nowIso(), streamId)
+    .first<{ id: string; prompt_text: string; sequence_num: number }>();
+
+  if (!job) {
+    // No more pending jobs (or another worker just took the last one).
+    return new Response(null, { status: 204 });
+  }
 
   logger.info('job claimed', {
     job_id: job.id,
@@ -354,18 +354,38 @@ async function handleStreamDone(
 
   const now = nowIso();
 
+  // Capture the authoritative instance id from D1 BEFORE the more-work path resets
+  // it to NULL. The worker-reported instance_id can be 0 (missing container env),
+  // so relying on it alone leaks orphan instances that keep billing.
+  const doneStreamRow = await env.DB
+    .prepare(`SELECT vast_instance_id FROM streams WHERE id = ?`)
+    .bind(streamId)
+    .first<{ vast_instance_id: string | null }>();
+  const doneDbInstanceId =
+    doneStreamRow?.vast_instance_id && doneStreamRow.vast_instance_id !== 'pending'
+      ? parseInt(doneStreamRow.vast_instance_id, 10)
+      : NaN;
+
   // Worker sends /done after exhausting all pending jobs — it is the authoritative signal.
   // Any jobs still in 'rendering' at this point belong to a crashed worker iteration;
   // fail them so the stream can close cleanly rather than hanging for 25+ min until reaper.
+  //
+  // Multi-GPU: scope to THIS instance's jobs only. Without the scope, a /done from
+  // one GPU worker would fail jobs that OTHER GPU workers on the same stream are
+  // still actively rendering. When instance_id is absent (legacy single-GPU), fall
+  // back to failing all rendering jobs (there is only one worker anyway).
+  const scopeInstance = typeof instanceId === 'number' && instanceId > 0;
   const failResult = await env.DB
-    .prepare(`
-      UPDATE jobs
-      SET state = 'failed',
-          error_message = 'Instance terminated — worker exited before completion',
-          failed_at = ?
-      WHERE stream_id = ? AND state = 'rendering'
-    `)
-    .bind(now, streamId)
+    .prepare(
+      scopeInstance
+        ? `UPDATE jobs SET state='failed',
+             error_message='Instance terminated — worker exited before completion', failed_at=?
+           WHERE stream_id=? AND state='rendering' AND vast_instance_id=?`
+        : `UPDATE jobs SET state='failed',
+             error_message='Instance terminated — worker exited before completion', failed_at=?
+           WHERE stream_id=? AND state='rendering'`
+    )
+    .bind(...(scopeInstance ? [now, streamId, String(instanceId)] : [now, streamId]))
     .run();
 
   const failedNow = (failResult as { meta?: { changes?: number } }).meta?.changes ?? 0;
@@ -421,17 +441,25 @@ async function handleStreamDone(
   }
 
   // Destroy Vast instance regardless (worker is exiting either way).
-  if (instanceId) {
-    try {
-      const vast = new VastClient(env.VAST_API_KEY, env.VAST_API_BASE_URL);
-      await vast.destroyInstance(instanceId);
-      logger.info('vast instance destroyed', { instance_id: instanceId, stream_id: streamId });
-    } catch (err) {
-      logger.error('failed to destroy vast instance', {
-        instance_id: instanceId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      // Don't fail the response — instance may already be gone.
+  // Destroy both the DB-authoritative id and the worker-reported id (deduped) so a
+  // missing/0 worker id can never leave an instance billing.
+  const doneToDestroy = new Set<number>();
+  if (!isNaN(doneDbInstanceId) && doneDbInstanceId > 0) doneToDestroy.add(doneDbInstanceId);
+  if (typeof instanceId === 'number' && instanceId > 0) doneToDestroy.add(instanceId);
+
+  if (doneToDestroy.size > 0) {
+    const vast = new VastClient(env.VAST_API_KEY, env.VAST_API_BASE_URL);
+    for (const id of doneToDestroy) {
+      try {
+        await vast.destroyInstance(id);
+        logger.info('vast instance destroyed', { instance_id: id, stream_id: streamId });
+      } catch (err) {
+        logger.error('failed to destroy vast instance', {
+          instance_id: id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        // Don't fail the response — instance may already be gone.
+      }
     }
   }
 
@@ -455,6 +483,22 @@ async function handleProvisionFailed(
     reason,
   });
 
+  // The worker-reported instance_id is unreliable: bootstrap.sh derives it from
+  // the container env, which can be missing → 0. A 0 here previously meant the
+  // broken instance was NEVER destroyed (the `if (instanceId)` guard was false),
+  // so it kept billing while the reaper provisioned a replacement — every failed
+  // boot leaked one orphan instance. The authoritative source is the stream's
+  // vast_instance_id in D1 (set by runProvisioning). Read it BEFORE resetting to
+  // 'pending', then destroy BOTH the DB id and the reported id.
+  const streamRow = await env.DB
+    .prepare(`SELECT vast_instance_id FROM streams WHERE id = ?`)
+    .bind(streamId)
+    .first<{ vast_instance_id: string | null }>();
+  const dbInstanceId =
+    streamRow?.vast_instance_id && streamRow.vast_instance_id !== 'pending'
+      ? parseInt(streamRow.vast_instance_id, 10)
+      : NaN;
+
   // Reset to 'pending' — reaper will re-provision on next tick (5+ min).
   // Do NOT mark stream completed: all jobs are still pending, stream should retry.
   await env.DB
@@ -462,18 +506,28 @@ async function handleProvisionFailed(
     .bind(streamId)
     .run();
 
-  // Destroy the broken instance immediately to stop billing.
-  if (instanceId) {
-    try {
-      const vast = new VastClient(env.VAST_API_KEY, env.VAST_API_BASE_URL);
-      await vast.destroyInstance(instanceId);
-      logger.info('provision-failed: broken instance destroyed', { instance_id: instanceId });
-    } catch (err) {
-      logger.warn('provision-failed: destroy failed (may already be gone)', {
-        instance_id: instanceId,
-        error: err instanceof Error ? err.message : String(err),
-      });
+  // Destroy every candidate instance id (DB + worker-reported), deduped, to stop billing.
+  const toDestroy = new Set<number>();
+  if (!isNaN(dbInstanceId) && dbInstanceId > 0) toDestroy.add(dbInstanceId);
+  if (typeof instanceId === 'number' && instanceId > 0) toDestroy.add(instanceId);
+
+  if (toDestroy.size > 0) {
+    const vast = new VastClient(env.VAST_API_KEY, env.VAST_API_BASE_URL);
+    for (const id of toDestroy) {
+      try {
+        await vast.destroyInstance(id);
+        logger.info('provision-failed: broken instance destroyed', { instance_id: id });
+      } catch (err) {
+        logger.warn('provision-failed: destroy failed (may already be gone)', {
+          instance_id: id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
+  } else {
+    logger.error('provision-failed: no instance id to destroy — orphan reaper will catch it', {
+      stream_id: streamId,
+    });
   }
 
   return Response.json({ ok: true });

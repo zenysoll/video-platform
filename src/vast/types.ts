@@ -29,6 +29,8 @@ export interface VastOffer {
   datacenter?: string;
   /** Datacenter location string, ends with ", XX" ISO country code (e.g. "US, TX, Dallas, US") */
   geolocation?: string;
+  /** Vast.ai host verification status: 'verified' | 'unverified' | 'deverified'. */
+  verification?: string;
 }
 
 export interface VastInstance {
@@ -62,6 +64,19 @@ export interface VastSearchQuery {
   min_reliability?: number;
   /** Minimum download bandwidth in Mbps (e.g. 500 ≈ 60 MB/s). Filters slow instances. */
   min_inet_down?: number;
+  /**
+   * Require Vast.ai-"verified" hosts only. Verified hosts pass Vast.ai's automated
+   * GPU-container verification; unverified/deverified hosts are the main source of
+   * "failed to inject CDI devices" / OCI-runtime errors (broken nvidia-container-toolkit).
+   * Maps to server-side filter `verified: {eq: true}`. Confirmed no price premium.
+   */
+  verified?: boolean;
+  /**
+   * Minimum `cuda_max_good` — the highest CUDA version the host driver supports.
+   * Set to 12.8 to guarantee the driver can run cu128 / Blackwell (sm_120) kernels.
+   * Maps to server-side filter `cuda_max_good: {gte: N}`.
+   */
+  min_cuda_max_good?: number;
   /** Exact number of GPUs required (e.g. 1, 2, 4 for multi-GPU streams) */
   num_gpus?: number;
   /**

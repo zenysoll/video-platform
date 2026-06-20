@@ -33,8 +33,12 @@ WORKFLOW_PATH     = "/workspace/workflow.json"
 WORKFLOW_URL      = f"{CONTROL_PLANE_URL}/worker/workflow.json"
 COMFY_OUTPUT_DIR  = "/workspace/ComfyUI/output"
 
-POLL_INTERVAL_SEC = 10  # seconds between job claim attempts when queue is empty
-MAX_IDLE_POLLS    = 60  # give up after ~10 minutes of no jobs — allows time for next batch to arrive
+POLL_INTERVAL_SEC = 10   # seconds between job claim attempts when queue is empty
+# Give up after ~40 min of no jobs. Must exceed the reaper's batch-chain repair
+# window (BATCH_CHAIN_STALL_MIN=30) so a transient Gemini stall that pauses prompt
+# generation does NOT make the worker exit and trigger a full re-provision +
+# re-download of the 55 GB model set. 240 × 10s = 40 min.
+MAX_IDLE_POLLS    = 240
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -119,6 +123,13 @@ def report_fail(job_id: str, error: str) -> None:
 
 
 def read_instance_id() -> str:
+    # Vast.ai exposes the instance id at runtime as $CONTAINER_ID. The old path
+    # (/etc/vast_instance_id) does not exist on Vast hosts, so this used to always
+    # return "unknown" — breaking per-worker job attribution (multi-GPU) and the
+    # /done instance scoping. Prefer the env var, fall back to the (legacy) file.
+    cid = os.environ.get("CONTAINER_ID")
+    if cid:
+        return cid.strip()
     try:
         return Path("/etc/vast_instance_id").read_text().strip()
     except Exception:
