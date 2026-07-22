@@ -119,6 +119,22 @@ export class VastClient {
       });
     }
 
+    // Client-side HOST exclusion. This is the important one: a broken host rotates
+    // machine ids, so excluded_machine_ids alone never blocks it. Combines the
+    // permanent env blocklist with hosts that recently stalled a stream.
+    if (query.excluded_host_ids && query.excluded_host_ids.length > 0) {
+      const excluded = new Set(query.excluded_host_ids);
+      const before = offers.length;
+      offers = offers.filter(o => o.host_id === undefined || !excluded.has(o.host_id));
+      if (offers.length !== before) {
+        logger.info('vast offers after host_id filter', {
+          excluded_hosts: query.excluded_host_ids.length,
+          dropped: before - offers.length,
+          remaining: offers.length,
+        });
+      }
+    }
+
     // Client-side verification safety net: even though `verified: {eq:true}` is sent
     // server-side, drop any non-'verified' offer defensively (e.g. if the API ever
     // changes behaviour). 'deverified' hosts in particular failed re-verification and
@@ -154,6 +170,12 @@ export class VastClient {
       onstart: config.onstart,
       label: config.label,
     };
+
+    // Registry credentials for private images. Omitted entirely when unset so
+    // public pulls stay anonymous. Never logged — see the logger call below.
+    if (config.image_login) {
+      body['image_login'] = config.image_login;
+    }
 
     // env vars are embedded in onstart command — extra_env is not used.
 

@@ -1,0 +1,73 @@
+name: Build GPU worker image
+
+# Publishes ghcr.io/<owner>/comfyui-ltx:cu128 — the image Vast.ai instances pull.
+#
+# Runs on GitHub's amd64 runners: Vast GPU hosts are x86_64, and building that
+# platform on an arm64 Mac means qemu-emulated pip installs (hours, and cu128
+# wheels have no arm64 build at all).
+#
+# ghcr.io is deliberate. Anonymous Docker Hub pulls are rate-limited per source IP,
+# and multi-tenant Vast hosts put every container behind one shared IP — neighbours
+# exhaust the quota and our pull wedges mid-layer, leaving the instance in 'loading'
+# forever. ghcr.io serves public images unmetered.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - '.github/workflows/build-worker-image.yml'
+  workflow_dispatch:  # manual rebuilds without touching the Dockerfile
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/comfyui-ltx
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write   # required to push to ghcr.io
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Frees ~25 GB on the runner. The image lands around 12-15 GB unpacked and
+      # the default runner has ~14 GB free, so the build ENOSPCs without this.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo rm -rf /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+          df -h /
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          # cu128 is the tag the control plane pins (WORKER_IMAGE in
+          # src/queues/stream-consumer.ts). The sha tag gives an immutable
+          # rollback target when a rebuild regresses.
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu128
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Report image size
+        run: |
+          echo "Pushed ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu128"
+          echo "Make the package PUBLIC once, at:"
+          echo "  https://github.com/users/${{ github.repository_owner }}/packages/container/comfyui-ltx/settings"
+          echo "Private packages need image_login credentials on every Vast instance."

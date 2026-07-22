@@ -26,6 +26,16 @@ export interface VastOffer {
   inet_down: number;
   cuda_max_good?: number;
   machine_id?: number;
+  /**
+   * Vast.ai host (owner) id. One host owns many machines and rotates machine ids,
+   * so this — not machine_id — is the stable identity of a bad provider.
+   */
+  host_id?: number;
+  /**
+   * Public egress IP. Multi-tenant hosts put every container behind one IP, which
+   * is why anonymous Docker Hub pulls (rate-limited per IP) wedge on busy hosts.
+   */
+  public_ipaddr?: string;
   datacenter?: string;
   /** Datacenter location string, ends with ", XX" ISO country code (e.g. "US, TX, Dallas, US") */
   geolocation?: string;
@@ -92,6 +102,13 @@ export interface VastSearchQuery {
    * Populated from the VAST_EXCLUDED_MACHINES env var.
    */
   excluded_machine_ids?: number[];
+  /**
+   * Vast.ai HOST ids to exclude — filtered client-side. Combines two sources:
+   * the permanent VAST_EXCLUDED_HOSTS env list, and hosts that recently stalled a
+   * stream (from the host_failures table). This is the filter that stops the
+   * "cheapest offer is always the same broken host" retry loop.
+   */
+  excluded_host_ids?: number[];
   /** Sort expression, e.g. "dph_total asc" */
   order?: string;
   /** Maximum number of results (default: 20) */
@@ -109,6 +126,14 @@ export interface VastStartConfig {
   label?: string;
   /** Disk space to allocate in GB */
   disk?: number;
+  /**
+   * Docker registry credentials, in `docker login` argument form:
+   *   "-u USERNAME -p TOKEN ghcr.io"
+   * Maps to the Vast.ai `image_login` body field. Only needed for private images —
+   * public ghcr.io pulls are unauthenticated and, unlike Docker Hub, unmetered.
+   * Never logged.
+   */
+  image_login?: string;
 }
 
 export class VastApiError extends Error {

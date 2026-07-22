@@ -145,14 +145,46 @@ export default {
     // Debug: Vast.ai offer search — Bearer auth required.
     if (path === '/debug/vast-search' && request.method === 'GET') {
       if (!verifyWorkerAuth(request, env.WORKER_SECRET)) return unauthorizedResponse();
+      // Runs the PRODUCTION selection policy (findOffers), not a private copy of the
+      // thresholds — a debug route with its own constants can report a healthy pool
+      // while provisioning picks from a different, broken one.
       const { VastClient } = await import('./vast/client.js');
+      const { findOffers } = await import('./queues/stream-consumer.js');
       const vast = new VastClient(env.VAST_API_KEY, env.VAST_API_BASE_URL);
-      const base = { min_gpu_ram: 30, min_cpu_ram: 48, min_disk_space: 120, min_reliability: 0.98, min_inet_down: 500, num_gpus: 1, excluded_countries: ['CN','KR'], order: 'dph_total asc', limit: 20 };
-      const [preferred, fallback] = await Promise.all([
-        vast.searchOffers({ ...base, gpu_name: 'RTX 5090' }).catch((e: unknown) => ({ error: String(e) })),
-        vast.searchOffers(base).catch((e: unknown) => ({ error: String(e) })),
-      ]);
-      return Response.json({ preferred, fallback });
+      const gpuCount = parseInt(url.searchParams.get('gpu_count') ?? '1', 10) || 1;
+
+      const benched = await env.DB
+        .prepare(`SELECT host_id, reason, failed_at FROM host_failures WHERE failed_at >= ? ORDER BY failed_at DESC`)
+        .bind(new Date(Date.now() - 6 * 3_600_000).toISOString())
+        .all()
+        .catch(() => ({ results: [] as unknown[] }));
+
+      try {
+        const offers = await findOffers(env, vast, gpuCount);
+        // The order the provisioner would actually try, one attempt per host.
+        const seen = new Set<number>();
+        const plan = [];
+        for (const o of offers) {
+          if (o.host_id !== undefined) {
+            if (seen.has(o.host_id)) continue;
+            seen.add(o.host_id);
+          }
+          plan.push({
+            offer_id: o.id, host_id: o.host_id, machine_id: o.machine_id,
+            dph: o.dph_total, reliability: o.reliability2, inet_down: o.inet_down,
+            geo: (o as { geolocation?: string }).geolocation,
+          });
+        }
+        return Response.json({
+          image: env.WORKER_IMAGE ?? '(default: ghcr.io)',
+          offers_found: offers.length,
+          distinct_hosts: plan.length,
+          benched_hosts: benched.results,
+          attempt_plan: plan,
+        });
+      } catch (e: unknown) {
+        return Response.json({ error: String(e) }, { status: 500 });
+      }
     }
 
     // Debug: test Vast.ai startInstance + getInstance end-to-end — Bearer auth required.

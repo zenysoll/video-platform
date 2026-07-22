@@ -112,10 +112,20 @@ const STREAM_HARD_LIMIT_HOURS = 24;
 /**
  * An instance still stuck in 'loading'/'created' (never reached 'running') after
  * this long is recycled. Healthy hosts reach 'running' within a few minutes; a
- * host stuck loading for 20+ min is broken (e.g. "Secrets fetch failed", a stuck
- * Docker pull). Caught much faster than the 40-min alive-but-dead threshold.
+ * host stuck loading is broken (e.g. "Secrets fetch failed", a wedged Docker pull).
+ *
+ * Lowered 20 → 10: the pre-built ghcr.io image pulls in ~2-4 min, so 10 min is
+ * already generous, and every minute here is dead time the operator watches. With
+ * host benching + immediate re-provision, a bad host now costs ~10 min once instead
+ * of 35 min on repeat.
  */
-const LOADING_STUCK_MIN = 20;
+const LOADING_STUCK_MIN = 10;
+
+/**
+ * Give a recycled host this long before it can be selected again. Mirrors
+ * HOST_FAILURE_COOLDOWN_H in stream-consumer.ts (the reader side).
+ */
+const HOST_BENCH_HOURS = 6;
 
 export async function runReaper(env: Env): Promise<void> {
   logger.info('reaper run started');
@@ -691,7 +701,7 @@ async function sweepStalledStreams(env: Env): Promise<number> {
 
   const candidates = await env.DB
     .prepare(`
-      SELECT s.id, s.user_id, s.vast_instance_id, s.started_at,
+      SELECT s.id, s.user_id, s.vast_instance_id, s.vast_host_id, s.started_at,
              s.total_videos, s.videos_rendered,
              (SELECT MAX(j2.render_completed_at) FROM jobs j2 WHERE j2.stream_id = s.id) AS last_render,
              (SELECT MAX(j3.render_started_at)   FROM jobs j3 WHERE j3.stream_id = s.id) AS last_start
@@ -700,7 +710,8 @@ async function sweepStalledStreams(env: Env): Promise<number> {
         AND EXISTS (SELECT 1 FROM jobs j WHERE j.stream_id = s.id AND j.state = 'pending')
     `)
     .all<{
-      id: string; user_id: number; vast_instance_id: string | null; started_at: string | null;
+      id: string; user_id: number; vast_instance_id: string | null; vast_host_id: number | null;
+      started_at: string | null;
       total_videos: number; videos_rendered: number;
       last_render: string | null; last_start: string | null;
     }>();
@@ -770,16 +781,56 @@ async function sweepStalledStreams(env: Env): Promise<number> {
     const aliveButDead = actualStatus === 'running' && instanceAgeMin >= STALL_RECYCLE_MIN;
     if (!stuckLoading && !aliveButDead) continue; // still booting / progressing — protect
 
+    const reason = stuckLoading ? 'stuck-loading' : 'alive-but-dead';
     logger.error('reaper: stalled host — recycling instance', {
-      stream_id: s.id, instance_id: instanceId, actual_status: actualStatus,
-      reason: stuckLoading ? 'stuck-loading' : 'alive-but-dead',
+      stream_id: s.id, instance_id: instanceId, host_id: s.vast_host_id, actual_status: actualStatus,
+      reason,
       instance_age_min: Math.round(instanceAgeMin), last_activity: lastActivity ?? 'never',
     });
     try { await vast.destroyInstance(instanceId); } catch { /* may be gone */ }
+
+    // Bench the host BEFORE clearing the instance, so the re-provision below cannot
+    // race back onto it. Without this the next search — deterministic `dph_total asc`
+    // — hands back the same cheapest broken host and the stream loops forever.
+    if (s.vast_host_id) {
+      try {
+        await env.DB
+          .prepare(`INSERT INTO host_failures (host_id, reason, stream_id, failed_at) VALUES (?, ?, ?, ?)`)
+          .bind(s.vast_host_id, reason, s.id, nowIso())
+          .run();
+        logger.info('reaper: host benched', {
+          host_id: s.vast_host_id, reason, cooldown_hours: HOST_BENCH_HOURS,
+        });
+      } catch (err) {
+        logger.warn('reaper: could not bench host', {
+          host_id: s.vast_host_id, error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     await env.DB
-      .prepare(`UPDATE streams SET vast_instance_id=NULL WHERE id=? AND vast_instance_id=?`)
+      .prepare(`UPDATE streams SET vast_instance_id=NULL, vast_host_id=NULL WHERE id=? AND vast_instance_id=?`)
       .bind(s.id, s.vast_instance_id)
       .run();
+
+    // Re-provision immediately instead of waiting for sweep 3 on the next cron tick.
+    // Sweep 3 runs earlier in runReaper()'s Promise.all, so it has already passed by
+    // the time we null the instance here — leaving the stream idle for a full 15-min
+    // cron interval on top of the detection delay.
+    try {
+      await enqueueStreamLaunch(env.STREAM_QUEUE, {
+        stream_id: s.id,
+        user_id: s.user_id,
+        batch_index: 99,  // sentinel: provision-only, skip prompt gen
+        batch_size: 0,
+        seq_start: 0,
+      });
+      logger.info('reaper: re-enqueued provisioning after recycle', { stream_id: s.id });
+    } catch (err) {
+      logger.error('reaper: re-enqueue after recycle failed — sweep 3 will retry', {
+        stream_id: s.id, error: err instanceof Error ? err.message : String(err),
+      });
+    }
     acted++;
   }
 

@@ -72,4 +72,20 @@ export interface Env {
    * Example: "36773,12345"
    */
   VAST_EXCLUDED_MACHINES?: string;
+  /**
+   * Comma-separated Vast.ai HOST IDs to permanently exclude from offer selection.
+   *
+   * Prefer this over VAST_EXCLUDED_MACHINES: a broken host rotates machine ids
+   * (host 402342 served machines 73811 / 91334 / 91308 for the same rig), so a
+   * machine-level ban never sticks. Host-level bans are permanent; transient
+   * failures are handled automatically by the host_failures cooldown table.
+   * Example: "402342,12345"
+   */
+  VAST_EXCLUDED_HOSTS?: string;
+  /**
+   * Docker image for GPU workers. Overrides DEFAULT_WORKER_IMAGE in
+   * stream-consumer.ts so the image can be rolled forward/back via config.
+   * Unset → the ghcr.io pre-built image.
+   */
+  WORKER_IMAGE?: string;
 }

@@ -15,6 +15,10 @@ dist/
 # Local dev secrets (never commit)
 .dev.vars
 
+# Python bytecode (src/worker/*.py is shipped to GPU workers as source)
+__pycache__/
+*.pyc
+
 # macOS
 .DS_Store
 

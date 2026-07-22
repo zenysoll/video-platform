@@ -23,6 +23,7 @@ import { enqueueRenderJob } from './render-producer.js';
 import { generatePromptBatch, persistPromptFingerprints } from '../prompts/pipeline.js';
 import { buildPriorAvoidLabelsForStream } from '../prompts/fingerprint.js';
 import { VastClient } from '../vast/client.js';
+import type { VastOffer } from '../vast/types.js';
 import { generateId, nowIso } from '../lib/idempotency.js';
 import { logger } from '../lib/logger.js';
 
@@ -37,7 +38,12 @@ const PRIOR_PROMPT_SNIPPET_LIMIT = 18;
 const GPU_MIN_VRAM_GB = 30;          // RTX 5090 = 32 GB; 30 gives safety margin vs off-by-one floats
 const GPU_MIN_RAM_GB = 48;           // system RAM — use 48 so cheapest RTX 5090 (cpu_ram≈64 GB reported as ~64009 MB) passes the filter
 const GPU_MIN_DISK_GB = 120;         // 46 GB model + 9 GB Gemma + ComfyUI + workspace buffer (reduced from 200 — image pre-installs ComfyUI)
-const GPU_MIN_RELIABILITY = 0.98;   // reliability2 score 0–1. 0.98+ filters out worst hosts while keeping cheap US supply
+// reliability2 score 0–1. Raised 0.98 → 0.99 after the 2026-07-21 outage: the host
+// that wedged two streams (402342, docker pull stalled behind a shared-IP Docker Hub
+// rate limit) scored 0.9884 — it passed 0.98 and, being the cheapest offer, was picked
+// first on every single retry. At 0.99 supply stays ~24 offers and the cheapest goes
+// $0.295 → $0.343/hr: cents per stream against 30–60 min of dead time per bad host.
+const GPU_MIN_RELIABILITY = 0.99;
 const GPU_MIN_INET_DOWN = 1500;      // 1500 Mbps ≈ 190 MB/s — filters slow hosts (was 500: let in 525-790 Mbps hosts that made the 55 GB download crawl). Verified supply stays ~37 offers at this floor.
 const GPU_MIN_CUDA_MAX_GOOD = 12.8;  // host driver must support CUDA ≥12.8 (cu128 / Blackwell sm_120). All current RTX 5090 hosts pass; future-proofs against old-driver hosts.
 const GPU_PREFERRED = 'RTX 5090';   // Vast.ai uses spaces in GPU names
@@ -46,7 +52,29 @@ const GPU_PREFERRED = 'RTX 5090';   // Vast.ai uses spaces in GPU names
 // Cold-start: ~5-7 min (R2 model download) vs ~20 min (full bootstrap from scratch).
 // Build: docker build -t YOUR_DOCKERHUB/comfyui-ltx:cu128 . && docker push ...
 // After pushing, replace the tag below with your Docker Hub image.
-const WORKER_IMAGE = 'pytorch/pytorch:2.6.0-cuda12.6-cudnn9-runtime'; // TODO: replace with pre-built image after push
+// Pre-built worker image on GitHub Container Registry.
+//
+// NOT Docker Hub: anonymous Docker Hub pulls are rate-limited per source IP
+// (10/hour, 100/6h). Multi-tenant Vast hosts run every container behind one shared
+// IP, so neighbours burn the quota and our pull wedges mid-layer — the instance sits
+// in 'loading' at "Pulling from …" forever. ghcr.io serves public images unmetered.
+//
+// Built from ./Dockerfile by .github/workflows/build-worker-image.yml.
+// Bakes torch cu128 + ComfyUI + LTX nodes, so bootstrap only fetches weights:
+// cold start ~5 min instead of ~20.
+const DEFAULT_WORKER_IMAGE = 'ghcr.io/zenysoll/comfyui-ltx:cu128';
+
+/**
+ * Resolve the worker image, overridable via the WORKER_IMAGE var in wrangler.toml.
+ *
+ * Env-driven so the image can be rolled forward or back with a config change
+ * instead of a code deploy — which matters most during the Docker Hub → ghcr.io
+ * cutover, where the control plane must keep provisioning on the old image until
+ * the new one is built, pushed and confirmed public.
+ */
+function resolveWorkerImage(env: Env): string {
+  return env.WORKER_IMAGE?.trim() || DEFAULT_WORKER_IMAGE;
+}
 
 export async function handleStreamBatch(
   batch: MessageBatch<unknown>,
@@ -260,6 +288,42 @@ async function processStreamBatch(msg: StreamLaunchMessage, env: Env): Promise<v
   }
 }
 
+/**
+ * How long a host stays benched after it stalled a stream.
+ *
+ * Matches Docker Hub's 6-hour rate-limit window — the dominant transient cause of a
+ * wedged pull on a multi-tenant host. Long enough that a stream retrying every few
+ * minutes never returns to the bad host; short enough that a host with a one-off
+ * blip rejoins the pool on its own, with no deploy and no manual blocklist edit.
+ */
+const HOST_FAILURE_COOLDOWN_H = 6;
+
+/** Parse a comma-separated id list from env (e.g. "402342,12345"). */
+function parseIdList(raw: string | undefined): number[] {
+  return (raw ?? '')
+    .split(',')
+    .map(s => parseInt(s.trim(), 10))
+    .filter(n => !isNaN(n) && n > 0);
+}
+
+/** Hosts that stalled a stream within the cooldown window. Never throws — a DB
+ *  hiccup must not block provisioning entirely, it just costs us the filter. */
+async function recentlyFailedHosts(env: Env): Promise<number[]> {
+  const cutoff = new Date(Date.now() - HOST_FAILURE_COOLDOWN_H * 3_600_000).toISOString();
+  try {
+    const rows = await env.DB
+      .prepare(`SELECT DISTINCT host_id FROM host_failures WHERE failed_at >= ?`)
+      .bind(cutoff)
+      .all<{ host_id: number }>();
+    return rows.results.map(r => r.host_id);
+  } catch (err) {
+    logger.warn('could not read host_failures — provisioning without cooldown filter', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return [];
+  }
+}
+
 async function provisionVastInstance(
   streamId: string,
   stream: { id: string; state: string; total_videos: number; duration_secs: number; gpu_count: number },
@@ -330,11 +394,49 @@ async function runProvisioning(
   const vast = new VastClient(env.VAST_API_KEY, env.VAST_API_BASE_URL);
   const gpuCount = stream.gpu_count ?? 1;
 
+  const offers = await findOffers(env, vast, gpuCount, streamId);
+
+  if (offers.length === 0) {
+    logger.error('no suitable GPU offers found — will retry on next reaper run', { stream_id: streamId });
+    // Keep 'pending' — reaper will reset and re-enqueue after PROVISION_TIMEOUT_MIN.
+    return;
+  }
+
+  logger.info('found GPU offers', {
+    stream_id: streamId,
+    count: offers.length,
+    distinct_hosts: new Set(offers.map(o => o.host_id)).size,
+    best_geo: (offers[0] as {geolocation?:string}).geolocation ?? '?',
+  });
+
+  await startOnBestOffer(streamId, stream, env, vast, offers, gpuCount);
+}
+
+/**
+ * Find candidate offers using the production selection policy.
+ *
+ * Exported so /debug/vast-search exercises this exact code path — the previous debug
+ * route carried its own hardcoded thresholds, so it could report a healthy pool while
+ * production selected from a different (and in the 2026-07-21 outage, broken) one.
+ */
+export async function findOffers(
+  env: Env,
+  vast: VastClient,
+  gpuCount: number,
+  streamId = 'debug',
+): Promise<VastOffer[]> {
   // Parse excluded machine IDs from env (comma-separated integers).
-  const excludedMachines = (env.VAST_EXCLUDED_MACHINES ?? '')
-    .split(',')
-    .map(s => parseInt(s.trim(), 10))
-    .filter(n => !isNaN(n) && n > 0);
+  const excludedMachines = parseIdList(env.VAST_EXCLUDED_MACHINES);
+
+  // Host-level exclusions = permanent env blocklist + hosts that recently stalled a
+  // stream. The dynamic half is what breaks the retry loop: without it, offer search
+  // is deterministic (dph_total asc → offers[0]) and re-provisioning after a recycle
+  // lands on the exact same broken host, forever. Banning machine ids cannot fix this
+  // because one host rotates machine ids across its rigs.
+  const excludedHosts = [
+    ...parseIdList(env.VAST_EXCLUDED_HOSTS),
+    ...await recentlyFailedHosts(env),
+  ];
 
   // Search: prefer RTX 5090, fall back to any GPU meeting minimums.
   // Exclude CN: local inet_down looks fast but R2 throughput from China is ~20 MB/s
@@ -356,8 +458,11 @@ async function runProvisioning(
     num_gpus: gpuCount,
     excluded_countries: ['CN', 'KR'],  // CN: slow R2; KR: Vast infra docker_build errors
     excluded_machine_ids: excludedMachines,
+    excluded_host_ids: excludedHosts,
     order: 'dph_total asc',
-    limit: 10,
+    // Raised 10 → 25: host exclusions and per-attempt host diversity both consume
+    // candidates, and a 10-offer page can be dominated by a handful of hosts.
+    limit: 25,
   };
 
   logger.info('searching Vast.ai GPU offers', { stream_id: streamId, gpu_count: gpuCount });
@@ -380,19 +485,39 @@ async function runProvisioning(
     offers = await vast.searchOffers({ ...baseQuery, verified: false, gpu_name: GPU_PREFERRED });
   }
 
-  if (offers.length === 0) {
-    logger.error('no suitable GPU offers found — will retry on next reaper run', { stream_id: streamId });
-    // Keep 'pending' — reaper will reset and re-enqueue after PROVISION_TIMEOUT_MIN.
-    return;
+  // Tier 4 (safety valve): drop the *dynamic* host cooldown, keeping the permanent
+  // env blocklist. A long outage could bench every host in the pool — a benched host
+  // is only suspected, not proven bad, so a stalled stream must never be preferred
+  // over retrying one. Permanently-blocked hosts stay blocked.
+  if (offers.length === 0 && excludedHosts.length > parseIdList(env.VAST_EXCLUDED_HOSTS).length) {
+    logger.warn('all hosts benched — retrying without the failure cooldown', {
+      stream_id: streamId, benched: excludedHosts.length,
+    });
+    offers = await vast.searchOffers({
+      ...baseQuery,
+      excluded_host_ids: parseIdList(env.VAST_EXCLUDED_HOSTS),
+      gpu_name: GPU_PREFERRED,
+    });
   }
 
-  logger.info('found GPU offers', { stream_id: streamId, count: offers.length, best_geo: (offers[0] as {geolocation?:string}).geolocation ?? '?' });
+  return offers;
+}
 
+/** Start an instance on the first offer that accepts, one attempt per host. */
+async function startOnBestOffer(
+  streamId: string,
+  stream: { total_videos: number },
+  env: Env,
+  vast: VastClient,
+  offers: VastOffer[],
+  gpuCount: number,
+): Promise<void> {
   const controlPlaneUrl = env.CONTROL_PLANE_URL;
 
   // Use slim bootstrap (models-only) when running a pre-built Docker image,
-  // full bootstrap otherwise. Switch by changing WORKER_IMAGE above.
-  const isPrebuiltImage = !WORKER_IMAGE.startsWith('pytorch/pytorch');
+  // full bootstrap otherwise. Switch via the WORKER_IMAGE var in wrangler.toml.
+  const workerImage = resolveWorkerImage(env);
+  const isPrebuiltImage = !workerImage.startsWith('pytorch/pytorch');
   const bootstrapUrl = isPrebuiltImage
     ? `${controlPlaneUrl}/worker/bootstrap-models.sh`
     : `${controlPlaneUrl}/worker/bootstrap.sh`;
@@ -420,27 +545,40 @@ async function runProvisioning(
   let instance = null;
   let usedOffer = offers[0]!;
 
-  for (let attempt = 0; attempt < offers.length; attempt++) {
-    usedOffer = offers[attempt]!;
+  // One attempt per host. Two offers from the same host share its machine, disk,
+  // network and egress IP, so if the first wedges the second wedges identically —
+  // retrying there just burns another timeout.
+  const triedHosts = new Set<number>();
+  let attempt = 0;
+
+  for (const offer of offers) {
+    if (offer.host_id !== undefined && triedHosts.has(offer.host_id)) continue;
+    if (offer.host_id !== undefined) triedHosts.add(offer.host_id);
+    usedOffer = offer;
+    attempt++;
     try {
       logger.info('attempting to start Vast instance', {
         stream_id: streamId,
         offer_id: usedOffer.id,
+        host_id: usedOffer.host_id ?? null,
+        machine_id: usedOffer.machine_id ?? null,
+        dph: usedOffer.dph_total,
         geo: (usedOffer as {geolocation?:string}).geolocation ?? '?',
-        attempt: attempt + 1,
+        attempt,
       });
       instance = await vast.startInstance(usedOffer.id, {
-        image: WORKER_IMAGE,
+        image: workerImage,
         disk: GPU_MIN_DISK_GB,
         label: `stream-${streamId.slice(0, 8)}`,
         onstart,
       });
       break; // success — stop trying
     } catch (err) {
-      logger.warn('vast startInstance failed, trying next offer', {
+      logger.warn('vast startInstance failed, trying next host', {
         stream_id: streamId,
         offer_id: usedOffer.id,
-        attempt: attempt + 1,
+        host_id: usedOffer.host_id ?? null,
+        attempt,
         error: err instanceof Error ? err.message : String(err),
       });
       // Brief pause before trying next offer to avoid hammering the API.
@@ -457,9 +595,12 @@ async function runProvisioning(
     return;
   }
 
+  // Record the host alongside the instance: when the reaper later recycles a stalled
+  // instance it needs to know which host to bench, and the Vast instance API does not
+  // reliably echo the host back.
   await env.DB
-    .prepare(`UPDATE streams SET vast_instance_id = ? WHERE id = ?`)
-    .bind(String(instance.id), streamId)
+    .prepare(`UPDATE streams SET vast_instance_id = ?, vast_host_id = ? WHERE id = ?`)
+    .bind(String(instance.id), usedOffer.host_id ?? null, streamId)
     .run();
 
   logger.info('vast instance started', {
