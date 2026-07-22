@@ -33,6 +33,10 @@ CREATE TABLE IF NOT EXISTS streams (
     state           TEXT NOT NULL DEFAULT 'draft'
                         CHECK (state IN ('draft','queued','running','completed','failed','cancelled')),
 
+    -- quality mode: 'flex' (distilled LTX on RTX 5090) or 'max' (22B dev on
+    -- RTX PRO 6000 96GB). Selects a per-mode infra profile in src/config/modes.ts.
+    quality_mode    TEXT NOT NULL DEFAULT 'flex',
+
     -- video parameters
     total_videos    INTEGER NOT NULL,
     aspect_ratio    TEXT,                       -- '9:16' | '16:9' | '1:1' | 'custom'

@@ -6,6 +6,7 @@
  */
 
 import { nowIso } from '../lib/idempotency.js';
+import type { QualityMode } from '../config/modes.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,8 @@ export interface DbStream {
   bucket_id: string;
   name: string;
   state: string;
+  /** 'flex' | 'max' — parse with parseQualityMode, never trust the raw value. */
+  quality_mode: string;
   total_videos: number;
   aspect_ratio: string | null;
   width: number | null;
@@ -183,6 +186,7 @@ export interface InsertStreamParams {
   soundEnabled: boolean;
   channelId: string | null;
   gpuCount?: number;
+  qualityMode?: QualityMode;
 }
 
 export async function insertStream(db: D1Database, p: InsertStreamParams): Promise<void> {
@@ -193,14 +197,15 @@ export async function insertStream(db: D1Database, p: InsertStreamParams): Promi
         total_videos, aspect_ratio, width, height,
         fps, duration_secs, sound_enabled, channel_id,
         videos_queued, videos_rendered, videos_published, videos_failed,
-        gpu_count, created_at
-      ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?)
+        gpu_count, quality_mode, created_at
+      ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?)
     `)
     .bind(
       p.id, p.userId, p.bucketId, p.name,
       p.totalVideos, p.aspectRatio, p.width, p.height,
       p.fps, p.durationSecs, p.soundEnabled ? 1 : 0, p.channelId,
       p.gpuCount ?? 1,
+      p.qualityMode ?? 'flex',
       nowIso(),
     )
     .run();
