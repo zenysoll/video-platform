@@ -6,7 +6,7 @@
  *
  * Wizard step flow:
  *   waiting_password
- *   → wizard_name → wizard_total_videos → wizard_aspect_ratio
+ *   → wizard_quality → wizard_name → wizard_total_videos → wizard_aspect_ratio
  *   → (if custom) wizard_custom_width → wizard_custom_height
  *   → wizard_fps → wizard_duration → wizard_sound
  *   → wizard_bucket → (if new) wizard_bucket_name
@@ -14,9 +14,11 @@
  */
 
 import { getSession, upsertSession, clearSession } from '../../db/queries.js';
+import type { QualityMode } from '../../config/modes.js';
 
 export type WizardStep =
   | 'waiting_password'
+  | 'wizard_quality'
   | 'wizard_name'
   | 'wizard_total_videos'
   | 'wizard_aspect_ratio'
@@ -31,6 +33,7 @@ export type WizardStep =
   | 'wizard_confirm';
 
 export interface WizardData {
+  quality_mode?: QualityMode;
   name?: string;
   total_videos?: number;
   aspect_ratio?: string;
@@ -84,5 +87,5 @@ export async function resetToIdle(db: D1Database, userId: number): Promise<void>
 }
 
 export async function startWizard(db: D1Database, userId: number): Promise<void> {
-  await upsertSession(db, userId, 'wizard_name', {});
+  await upsertSession(db, userId, 'wizard_quality', {});
 }

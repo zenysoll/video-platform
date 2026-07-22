@@ -80,8 +80,8 @@ export async function handleControlUpdate(
       return;
     }
 
-    // Inline buttons from wizard steps (ar:, fps:, dur:, snd:, bkt:, tvid:, gpu:)
-    const wizardPrefixes = ['ar:', 'fps:', 'dur:', 'snd:', 'bkt:', 'tvid:', 'gpu:'];
+    // Inline buttons from wizard steps (qm:, ar:, fps:, dur:, snd:, bkt:, tvid:, gpu:)
+    const wizardPrefixes = ['qm:', 'ar:', 'fps:', 'dur:', 'snd:', 'bkt:', 'tvid:', 'gpu:'];
     if (wizardPrefixes.some(p => data.startsWith(p))) {
       await handleWizardCallback(query, env);
       return;

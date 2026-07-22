@@ -12,6 +12,11 @@ import { enqueueStreamLaunch } from '../../queues/stream-producer.js';
 import { VastClient } from '../../vast/client.js';
 import { logger } from '../../lib/logger.js';
 
+/** 💎 prefix marks max-quality streams wherever a stream name is rendered. */
+function modeBadge(s: { quality_mode?: string }): string {
+  return s.quality_mode === 'max' ? '💎 ' : '';
+}
+
 export async function handleStreamsCommand(chatId: number, userId: number, env: Env): Promise<void> {
   const [drafts, streams] = await Promise.all([
     getDraftStreamsForUser(env.DB, userId),
@@ -42,7 +47,7 @@ export async function handleStreamsCommand(chatId: number, userId: number, env: 
 
     await telegramCall('sendMessage', {
       chat_id: chatId,
-      text: `[DRAFT] ${s.name}\n\n${info}`,
+      text: `[DRAFT] ${modeBadge(s)}${s.name}\n\n${info}`,
       reply_markup: {
         inline_keyboard: [
           [
@@ -61,7 +66,7 @@ export async function handleStreamsCommand(chatId: number, userId: number, env: 
     const progress = `${s.videos_published}/${s.total_videos} published · rendered ${s.videos_rendered}`;
     await telegramCall('sendMessage', {
       chat_id: chatId,
-      text: `${s.name}  [${s.state}]\n${progress}`,
+      text: `${modeBadge(s)}${s.name}  [${s.state}]\n${progress}`,
       reply_markup: {
         inline_keyboard: [[
           { text: `⛔ Kill "${s.name}"`, callback_data: `stream:kill:${s.id}` },
@@ -75,7 +80,7 @@ export async function handleStreamsCommand(chatId: number, userId: number, env: 
     s.state === 'completed' || s.state === 'failed' || s.state === 'cancelled');
   if (finished.length > 0) {
     const lines = finished.map(s =>
-      `• ${s.name}  [${s.state}]  ${s.videos_published}/${s.total_videos} published`);
+      `• ${modeBadge(s)}${s.name}  [${s.state}]  ${s.videos_published}/${s.total_videos} published`);
     await telegramCall('sendMessage', {
       chat_id: chatId,
       text: `Finished:\n\n${lines.join('\n')}`,
@@ -183,7 +188,7 @@ async function buildStatusPayload(userId: number, env: Env): Promise<{ text: str
     }
 
     lines.push([
-      `<b>${s.name}</b>  [${s.state}]`,
+      `<b>${modeBadge(s)}${s.name}</b>  [${s.state}]`,
       `[${bar}] ${pct}%  ${pub}/${total} published`,
       `Rendered: ${ren}  Queued: ${queued}${failed > 0 ? `  Failed: ${failed}` : ''}`,
       gpuLine,

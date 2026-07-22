@@ -8,7 +8,7 @@
  * State is persisted in D1 between messages via session.ts.
  *
  * Step order:
- *   wizard_name → wizard_total_videos → wizard_aspect_ratio
+ *   wizard_quality → wizard_name → wizard_total_videos → wizard_aspect_ratio
  *   → (custom) wizard_custom_width → wizard_custom_height
  *   → wizard_fps → wizard_duration → wizard_sound
  *   → wizard_gpu_count → wizard_bucket → (new) wizard_bucket_name
@@ -33,10 +33,17 @@ export async function startWizardFlow(
   userId: number,
   env: Env,
 ): Promise<void> {
-  await saveSession(env.DB, userId, 'wizard_name', {});
+  await saveSession(env.DB, userId, 'wizard_quality', {});
   await telegramCall('sendMessage', {
     chat_id: chatId,
-    text: 'Stream name:',
+    text: `Quality:\n\n⚡ Flex — RTX 5090, distilled model, cheapest per video\n💎 Max — RTX PRO 6000 96GB, dev model, showcase quality (~5× cost)`,
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '⚡ Flex — быстро и дёшево', callback_data: 'qm:flex' }],
+        [{ text: '💎 Max — максимальное качество', callback_data: 'qm:max' }],
+        [cancelButton()],
+      ],
+    },
   }, env.CONTROL_BOT_TOKEN);
 }
 
@@ -106,6 +113,10 @@ export async function handleWizardCallback(
 
   const step = session.step as WizardStep | null;
 
+  if (step === 'wizard_quality' && data.startsWith('qm:')) {
+    return handleQualityChoice(chatId, userId, data.slice(3), wizardData, env, messageId);
+  }
+
   if (step === 'wizard_total_videos' && data.startsWith('tvid:')) {
     const n = parseInt(data.slice(5), 10);
     return handleTotalVideosInput(chatId, userId, String(n), wizardData, env, messageId);
@@ -151,6 +162,28 @@ export async function handleWizardCallback(
 }
 
 // ── Step handlers ─────────────────────────────────────────────────────────────
+
+async function handleQualityChoice(
+  chatId: number, userId: number, choice: string, data: WizardData, env: Env,
+  messageId?: number,
+): Promise<void> {
+  // Only the two button payloads are valid — anything else (stale button,
+  // forged callback) restarts the step instead of writing garbage into D1.
+  if (choice !== 'flex' && choice !== 'max') {
+    await telegramCall('sendMessage', {
+      chat_id: chatId, text: 'Please use the buttons to choose a quality mode.',
+    }, env.CONTROL_BOT_TOKEN);
+    return;
+  }
+
+  data.quality_mode = choice;
+  await saveSession(env.DB, userId, 'wizard_name', data);
+  await editMessage(
+    chatId, messageId,
+    `Quality: ${choice === 'max' ? '💎 Max' : '⚡ Flex'}\n\nStream name:`,
+    undefined, env,
+  );
+}
 
 async function handleNameInput(
   chatId: number, userId: number, text: string, data: WizardData, env: Env,
@@ -514,6 +547,7 @@ async function sendConfirmStep(
   const gpuCount = data.gpu_count ?? 1;
   const summary = [
     `Name:     ${data.name}`,
+    `Quality:  ${data.quality_mode === 'max' ? '💎 Max' : '⚡ Flex'}`,
     `Videos:   ${data.total_videos}`,
     `Size:     ${sizeStr}`,
     `FPS:      ${data.fps}`,
@@ -569,6 +603,7 @@ async function handleConfirmLaunch(
     soundEnabled: data.sound_enabled ?? false,
     channelId: env.TELEGRAM_CHANNEL_ID ?? null,
     gpuCount: data.gpu_count ?? 1,
+    qualityMode: data.quality_mode ?? 'flex',
   });
 
   // Launch immediately — the "Launch" button must actually queue the stream, not
@@ -591,7 +626,7 @@ async function handleConfirmLaunch(
 
   await resetToIdle(env.DB, userId);
 
-  logger.info('stream created and launched', { stream_id: streamId, user_id: userId, name: data.name });
+  logger.info('stream created and launched', { stream_id: streamId, user_id: userId, name: data.name, quality_mode: data.quality_mode ?? 'flex' });
 
   const confirmText = `Stream "${data.name}" launched.\n\nID: ${streamId.slice(0, 8)}...\n\nGenerating ${data.total_videos} prompts and queueing render jobs.`;
   if (messageId) {
