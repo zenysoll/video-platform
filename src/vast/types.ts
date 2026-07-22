@@ -109,6 +109,12 @@ export interface VastSearchQuery {
    * "cheapest offer is always the same broken host" retry loop.
    */
   excluded_host_ids?: number[];
+  /**
+   * Public egress IPs to exclude — filtered client-side. Distinct hosts can sit
+   * behind one datacenter NAT, and Docker Hub's pull quota is per IP, so benching
+   * only the host leaves its neighbours behind the same exhausted quota.
+   */
+  excluded_host_ips?: string[];
   /** Sort expression, e.g. "dph_total asc" */
   order?: string;
   /** Maximum number of results (default: 20) */

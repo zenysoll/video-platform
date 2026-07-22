@@ -711,7 +711,7 @@ async function sweepStalledStreams(env: Env): Promise<number> {
 
   const candidates = await env.DB
     .prepare(`
-      SELECT s.id, s.user_id, s.vast_instance_id, s.vast_host_id, s.started_at,
+      SELECT s.id, s.user_id, s.vast_instance_id, s.vast_host_id, s.vast_host_ip, s.started_at,
              s.total_videos, s.videos_rendered,
              (SELECT MAX(j2.render_completed_at) FROM jobs j2 WHERE j2.stream_id = s.id) AS last_render,
              (SELECT MAX(j3.render_started_at)   FROM jobs j3 WHERE j3.stream_id = s.id) AS last_start
@@ -721,6 +721,7 @@ async function sweepStalledStreams(env: Env): Promise<number> {
     `)
     .all<{
       id: string; user_id: number; vast_instance_id: string | null; vast_host_id: number | null;
+      vast_host_ip: string | null;
       started_at: string | null;
       total_videos: number; videos_rendered: number;
       last_render: string | null; last_start: string | null;
@@ -806,11 +807,11 @@ async function sweepStalledStreams(env: Env): Promise<number> {
     if (s.vast_host_id) {
       try {
         await env.DB
-          .prepare(`INSERT INTO host_failures (host_id, reason, stream_id, failed_at) VALUES (?, ?, ?, ?)`)
-          .bind(s.vast_host_id, reason, s.id, nowIso())
+          .prepare(`INSERT INTO host_failures (host_id, host_ip, reason, stream_id, failed_at) VALUES (?, ?, ?, ?, ?)`)
+          .bind(s.vast_host_id, s.vast_host_ip, reason, s.id, nowIso())
           .run();
         logger.info('reaper: host benched', {
-          host_id: s.vast_host_id, reason, cooldown_hours: HOST_BENCH_HOURS,
+          host_id: s.vast_host_id, host_ip: s.vast_host_ip, reason, cooldown_hours: HOST_BENCH_HOURS,
         });
       } catch (err) {
         logger.warn('reaper: could not bench host', {
@@ -820,7 +821,7 @@ async function sweepStalledStreams(env: Env): Promise<number> {
     }
 
     await env.DB
-      .prepare(`UPDATE streams SET vast_instance_id=NULL, vast_host_id=NULL WHERE id=? AND vast_instance_id=?`)
+      .prepare(`UPDATE streams SET vast_instance_id=NULL, vast_host_id=NULL, vast_host_ip=NULL WHERE id=? AND vast_instance_id=?`)
       .bind(s.id, s.vast_instance_id)
       .run();
 

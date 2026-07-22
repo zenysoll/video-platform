@@ -135,6 +135,20 @@ export class VastClient {
       }
     }
 
+    // Client-side egress-IP exclusion. Complements the host filter: a Docker Hub
+    // rate limit poisons every host behind the same NAT, not just the one that stalled.
+    if (query.excluded_host_ips && query.excluded_host_ips.length > 0) {
+      const excluded = new Set(query.excluded_host_ips);
+      const before = offers.length;
+      offers = offers.filter(o => !o.public_ipaddr || !excluded.has(o.public_ipaddr));
+      if (offers.length !== before) {
+        logger.info('vast offers after egress-IP filter', {
+          dropped: before - offers.length,
+          remaining: offers.length,
+        });
+      }
+    }
+
     // Client-side verification safety net: even though `verified: {eq:true}` is sent
     // server-side, drop any non-'verified' offer defensively (e.g. if the API ever
     // changes behaviour). 'deverified' hosts in particular failed re-verification and

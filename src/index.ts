@@ -154,7 +154,7 @@ export default {
       const gpuCount = parseInt(url.searchParams.get('gpu_count') ?? '1', 10) || 1;
 
       const benched = await env.DB
-        .prepare(`SELECT host_id, reason, failed_at FROM host_failures WHERE failed_at >= ? ORDER BY failed_at DESC`)
+        .prepare(`SELECT host_id, host_ip, reason, failed_at FROM host_failures WHERE failed_at >= ? ORDER BY failed_at DESC`)
         .bind(new Date(Date.now() - 6 * 3_600_000).toISOString())
         .all()
         .catch(() => ({ results: [] as unknown[] }));

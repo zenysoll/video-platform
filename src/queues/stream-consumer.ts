@@ -306,21 +306,24 @@ function parseIdList(raw: string | undefined): number[] {
     .filter(n => !isNaN(n) && n > 0);
 }
 
-/** Hosts that stalled a stream within the cooldown window. Never throws — a DB
- *  hiccup must not block provisioning entirely, it just costs us the filter. */
-async function recentlyFailedHosts(env: Env): Promise<number[]> {
+/** Hosts and egress IPs that stalled a stream within the cooldown window. Never
+ *  throws — a DB hiccup must not block provisioning, it just costs us the filter. */
+async function recentlyFailed(env: Env): Promise<{ hosts: number[]; ips: string[] }> {
   const cutoff = new Date(Date.now() - HOST_FAILURE_COOLDOWN_H * 3_600_000).toISOString();
   try {
     const rows = await env.DB
-      .prepare(`SELECT DISTINCT host_id FROM host_failures WHERE failed_at >= ?`)
+      .prepare(`SELECT DISTINCT host_id, host_ip FROM host_failures WHERE failed_at >= ?`)
       .bind(cutoff)
-      .all<{ host_id: number }>();
-    return rows.results.map(r => r.host_id);
+      .all<{ host_id: number; host_ip: string | null }>();
+    return {
+      hosts: rows.results.map(r => r.host_id),
+      ips: rows.results.map(r => r.host_ip).filter((ip): ip is string => !!ip),
+    };
   } catch (err) {
     logger.warn('could not read host_failures — provisioning without cooldown filter', {
       error: err instanceof Error ? err.message : String(err),
     });
-    return [];
+    return { hosts: [], ips: [] };
   }
 }
 
@@ -433,10 +436,8 @@ export async function findOffers(
   // is deterministic (dph_total asc → offers[0]) and re-provisioning after a recycle
   // lands on the exact same broken host, forever. Banning machine ids cannot fix this
   // because one host rotates machine ids across its rigs.
-  const excludedHosts = [
-    ...parseIdList(env.VAST_EXCLUDED_HOSTS),
-    ...await recentlyFailedHosts(env),
-  ];
+  const benched = await recentlyFailed(env);
+  const excludedHosts = [...parseIdList(env.VAST_EXCLUDED_HOSTS), ...benched.hosts];
 
   // Search: prefer RTX 5090, fall back to any GPU meeting minimums.
   // Exclude CN: local inet_down looks fast but R2 throughput from China is ~20 MB/s
@@ -459,6 +460,7 @@ export async function findOffers(
     excluded_countries: ['CN', 'KR'],  // CN: slow R2; KR: Vast infra docker_build errors
     excluded_machine_ids: excludedMachines,
     excluded_host_ids: excludedHosts,
+    excluded_host_ips: benched.ips,
     order: 'dph_total asc',
     // Raised 10 → 25: host exclusions and per-attempt host diversity both consume
     // candidates, and a 10-offer page can be dominated by a handful of hosts.
@@ -496,6 +498,7 @@ export async function findOffers(
     offers = await vast.searchOffers({
       ...baseQuery,
       excluded_host_ids: parseIdList(env.VAST_EXCLUDED_HOSTS),
+      excluded_host_ips: [],
       gpu_name: GPU_PREFERRED,
     });
   }
@@ -599,8 +602,8 @@ async function startOnBestOffer(
   // instance it needs to know which host to bench, and the Vast instance API does not
   // reliably echo the host back.
   await env.DB
-    .prepare(`UPDATE streams SET vast_instance_id = ?, vast_host_id = ? WHERE id = ?`)
-    .bind(String(instance.id), usedOffer.host_id ?? null, streamId)
+    .prepare(`UPDATE streams SET vast_instance_id = ?, vast_host_id = ?, vast_host_ip = ? WHERE id = ?`)
+    .bind(String(instance.id), usedOffer.host_id ?? null, usedOffer.public_ipaddr ?? null, streamId)
     .run();
 
   logger.info('vast instance started', {
