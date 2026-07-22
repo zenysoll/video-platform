@@ -74,8 +74,16 @@ RUN mkdir -p \
 
 WORKDIR /workspace
 
-# Hard build-time gate. get_arch_list() reports the wheel's COMPILED architectures
-# and needs no GPU, so this is valid inside a CPU builder — the previous version
-# swallowed it with `|| echo`, which is exactly how a wrong-arch image would ship.
-# Failing the build here is the point: it must never reach a rented GPU.
-RUN python -c "import torch; a = torch.cuda.get_arch_list(); print('torch', torch.__version__, 'archs', a); assert any('sm_12' in x for x in a), f'sm_120 missing from {a}'"
+# Hard build-time gate on the WHEEL BUILD, not the arch list.
+#
+# torch.cuda.get_arch_list() returns [] in a CPU-only builder — it needs an
+# initialised CUDA runtime, so it cannot verify anything here. What is verifiable
+# without a GPU is which wheel actually survived the install, and that is the real
+# risk this guards: ComfyUI's requirements.txt lists a bare `torch` and will happily
+# leave a CPU or cu126 build in place. sm_120 itself is asserted at runtime, on the
+# rented GPU, by bootstrap-models.sh.
+RUN python -c "\
+import torch; \
+print('torch', torch.__version__, 'cuda', torch.version.cuda); \
+assert torch.version.cuda == '12.8', f'expected CUDA 12.8 build, got {torch.version.cuda}'; \
+assert '+cu128' in torch.__version__, f'expected a +cu128 wheel, got {torch.__version__}'"

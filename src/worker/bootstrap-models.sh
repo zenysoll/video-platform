@@ -33,6 +33,45 @@ R2_ENDPOINT="https://95db7e4a7e28c95dfabfc52650591059.r2.cloudflarestorage.com"
 
 mkdir -p "$MODEL_DIR/checkpoints" "$MODEL_DIR/text_encoders"
 
+# Instance id for the provision-failed signal. $CONTAINER_ID is what Vast actually
+# sets at runtime; /etc/vast_instance_id does not exist (that assumption is what let
+# instances leak and bill forever).
+INSTANCE_ID="${CONTAINER_ID:-$(cat /etc/vast_instance_id 2>/dev/null || echo 0)}"
+
+# ── CUDA gate ─────────────────────────────────────────────────────────────────
+# Runs BEFORE the 55 GB model download so a bad host costs seconds, not 20 minutes.
+#
+# The image is built with a verified +cu128 wheel, but the arch list can only be
+# checked where a GPU exists — get_arch_list() is empty in a CPU builder, so this
+# check cannot live in the Dockerfile. It matters because torch.cuda.is_available()
+# is a FALSE POSITIVE on Blackwell with a wrong-CUDA build: it returns True while the
+# GPU's sm_NN kernels are missing, and inference only dies later with 'no kernel image'.
+if ! python3 -c "
+import torch, os, sys
+gpu_count = int(os.environ.get('GPU_COUNT', '1'))
+if not torch.cuda.is_available():
+    print('CUDA not available'); sys.exit(1)
+visible = torch.cuda.device_count()
+if visible < gpu_count:
+    print(f'Only {visible} GPU(s) visible, need {gpu_count}'); sys.exit(1)
+cap = torch.cuda.get_device_capability(0)
+cap_str = f'sm_{cap[0]}{cap[1]}'
+arch_list = torch.cuda.get_arch_list()
+if cap_str not in arch_list:
+    print(f'{cap_str} not in torch arch list {arch_list}'); sys.exit(1)
+" 2>/dev/null; then
+  LOG "FATAL: CUDA check failed (unavailable, too few GPUs, or torch missing sm_NN kernels for this GPU)."
+  nvidia-smi 2>&1 | head -5 || true
+  python3 -c "import torch; print('torch:', torch.__version__, 'cuda:', torch.cuda.is_available(), 'arch_list:', torch.cuda.get_arch_list())" 2>&1 || true
+  LOG "Sending provision-failed signal — reaper will bench this host and retry elsewhere."
+  curl -sf -X POST "${CONTROL_PLANE_URL}/worker/streams/${STREAM_ID}/provision-failed" \
+    -H "Authorization: Bearer ${WORKER_SECRET}" \
+    -H "Content-Type: application/json" \
+    -d "{\"instance_id\": ${INSTANCE_ID}, \"reason\": \"CUDA check failed on prebuilt image\"}" || true
+  exit 0  # clean exit — do NOT send done (that would mark the stream completed)
+fi
+LOG "CUDA OK — $(python3 -c 'import torch; print(f"{torch.cuda.device_count()} device(s), cu{torch.version.cuda} on {torch.cuda.get_device_name(0)}")')"
+
 # ── R2 download helper ────────────────────────────────────────────────────────
 r2_cp() {
   # $1 = R2 key, $2 = local dest
@@ -208,7 +247,6 @@ LOG "All workers finished."
 
 # ── Done signal → control plane destroys instance ─────────────────────────────
 LOG "Sending done signal..."
-INSTANCE_ID="${CONTAINER_ID:-$(cat /etc/vast_instance_id 2>/dev/null || echo 0)}"
 curl -sf -X POST "${CONTROL_PLANE_URL}/worker/streams/${STREAM_ID}/done" \
   -H "Authorization: Bearer ${WORKER_SECRET}" \
   -H "Content-Type: application/json" \
