@@ -154,6 +154,7 @@ async function processStreamBatch(msg: StreamLaunchMessage, env: Env): Promise<v
       batchIndex: batch_index,
       seqStart: seq_start,
       diversityMode: env.DIVERSITY_MODE ?? 'soft',
+      qualityMode: parseQualityMode(stream.quality_mode),
     },
   );
 

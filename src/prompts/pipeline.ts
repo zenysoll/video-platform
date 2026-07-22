@@ -15,11 +15,13 @@
  */
 
 import { generateBrief, type PromptBrief } from './planner.js';
+import { generateMaxBrief } from './planner-max.js';
 import { renderPrompt } from './renderer.js';
-import { validatePrompt, validateLength } from './validator.js';
+import { validatePrompt, validateLength, validateMaxLength } from './validator.js';
 import { computeFingerprint, isDuplicate, saveFingerprint } from './fingerprint.js';
 import { parseDiversityMode, stableSlotHints } from './diversity.js';
 import type { GeminiConfig } from './gemini.js';
+import type { QualityMode } from '../config/modes.js';
 import { logger } from '../lib/logger.js';
 
 const MAX_REROLLS = 4;
@@ -37,6 +39,12 @@ export interface PromptBatchMeta {
   seqStart: number;
   /** Raw env string; parsed with parseDiversityMode. */
   diversityMode: string;
+  /**
+   * Stream quality mode — 'max' switches to the structured cinematic planner
+   * (planner-max.ts). Fingerprinting, dedup and rerolls are identical in both
+   * modes; only the brief generator and the length window differ.
+   */
+  qualityMode?: QualityMode;
 }
 
 /**
@@ -89,6 +97,7 @@ export async function generatePromptBatch(
   let serviceOutage = false;
 
   const diversityMode = batchMeta ? parseDiversityMode(batchMeta.diversityMode) : parseDiversityMode('off');
+  const qualityMode: QualityMode = batchMeta?.qualityMode ?? 'flex';
 
   for (let i = 0; i < count; i++) {
     if (serviceOutage) break;
@@ -113,7 +122,11 @@ export async function generatePromptBatch(
     for (let attempt = 0; attempt < MAX_REROLLS; attempt++) {
       let brief: PromptBrief;
       try {
-        brief = await generateBrief(
+        // Same call shape in both modes — the max planner throws on any
+        // structural violation (bad JSON, off-list camera move) and lands in
+        // the same reroll path as a flex parse failure.
+        const generate = qualityMode === 'max' ? generateMaxBrief : generateBrief;
+        brief = await generate(
           usedThemes,
           streamContext,
           geminiConfig,
@@ -156,7 +169,9 @@ export async function generatePromptBatch(
         continue;
       }
 
-      const lengthCheck = validateLength(promptText);
+      const lengthCheck = qualityMode === 'max'
+        ? validateMaxLength(promptText)
+        : validateLength(promptText);
       if (!lengthCheck.ok) {
         logger.warn('prompt length invalid, rerolling', { reason: lengthCheck.reason, attempt, words: promptText.split(/\s+/).filter(Boolean).length, preview: promptText.slice(0, 120) });
         continue;

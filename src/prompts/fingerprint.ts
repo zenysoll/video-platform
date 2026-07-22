@@ -60,8 +60,9 @@ export async function saveFingerprint(
         (fingerprint, stream_id, job_id, created_at, theme, subject, action, environment, camera)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
-    // aesthetic → theme column; environment and camera not in new brief (empty strings — no schema migration needed)
-    .bind(fingerprint, streamId, jobId, now, brief.aesthetic, brief.subject, brief.action, '', '')
+    // aesthetic → theme column. environment/camera are only set by max-mode briefs
+    // (setting / camera_move); flex briefs keep the historical empty strings.
+    .bind(fingerprint, streamId, jobId, now, brief.aesthetic, brief.subject, brief.action, brief.environment ?? '', brief.camera ?? '')
     .run();
 }
 

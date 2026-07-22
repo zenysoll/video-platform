@@ -16,10 +16,16 @@ export interface PromptBrief {
   subject: string;    // main subject, 3-5 words
   action: string;     // what happens, 3-5 words
   prompt: string;     // FINAL ready-to-use video prompt, 20-25 words
+  // Max-mode extras (planner-max.ts). Persisted into the prompt_fingerprints
+  // environment/camera columns so the avoid-list sees setting-level repeats.
+  // Absent in flex briefs — the fingerprint hash itself stays aesthetic|subject|action
+  // in BOTH modes, so flex fingerprints are byte-identical to before.
+  environment?: string;
+  camera?: string;
 }
 
 /** Max avoid labels passed to Gemini (prior batches + current batch) to cap prompt size. */
-const MAX_AVOID_LABELS_IN_PROMPT = 88;
+export const MAX_AVOID_LABELS_IN_PROMPT = 88;
 
 const SYSTEM = `You are a creative director for a short-form social video platform.
 Generate ONE unique video clip concept in a strong, distinct aesthetic/vibe.

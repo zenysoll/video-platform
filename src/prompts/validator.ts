@@ -78,3 +78,15 @@ export function validateLength(promptText: string): ValidationResult {
   if (words > 60) return { ok: false, reason: `too long (${words} words)` };
   return { ok: true };
 }
+
+/**
+ * Max-mode word count guard. The server-rendered paragraph runs 4-8 sentences
+ * (~55-130 words including the constant style bible); below 40 a field came
+ * back degenerate, above 170 Gemini stuffed a field with a runaway phrase.
+ */
+export function validateMaxLength(promptText: string): ValidationResult {
+  const words = promptText.split(/\s+/).filter(Boolean).length;
+  if (words < 40) return { ok: false, reason: `too short for max mode (${words} words)` };
+  if (words > 170) return { ok: false, reason: `too long for max mode (${words} words)` };
+  return { ok: true };
+}
