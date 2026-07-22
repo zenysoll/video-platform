@@ -122,6 +122,16 @@ const STREAM_HARD_LIMIT_HOURS = 24;
 const LOADING_STUCK_MIN = 10;
 
 /**
+ * Read a minutes threshold from env, falling back to the compiled default.
+ * Lets the recycle thresholds be tuned (or driven to 0 for a verification run)
+ * with a config change instead of a code deploy.
+ */
+function minutesFromEnv(raw: string | undefined, fallback: number): number {
+  const n = parseInt(raw ?? '', 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+/**
  * Give a recycled host this long before it can be selected again. Mirrors
  * HOST_FAILURE_COOLDOWN_H in stream-consumer.ts (the reader side).
  */
@@ -776,8 +786,9 @@ async function sweepStalledStreams(env: Env): Promise<number> {
     //     stuck Docker pull). Caught at LOADING_STUCK_MIN (~20m), well before the
     //     slower alive-but-dead threshold.
     //   • ALIVE BUT DEAD — reached 'running' but no render progress for 40m+.
+    const loadingStuckMin = minutesFromEnv(env.REAPER_LOADING_STUCK_MIN, LOADING_STUCK_MIN);
     const stuckLoading = (actualStatus === 'loading' || actualStatus === 'created')
-      && instanceAgeMin >= LOADING_STUCK_MIN;
+      && instanceAgeMin >= loadingStuckMin;
     const aliveButDead = actualStatus === 'running' && instanceAgeMin >= STALL_RECYCLE_MIN;
     if (!stuckLoading && !aliveButDead) continue; // still booting / progressing — protect
 

@@ -88,4 +88,9 @@ export interface Env {
    * Unset → the ghcr.io pre-built image.
    */
   WORKER_IMAGE?: string;
+  /**
+   * Override LOADING_STUCK_MIN in the reaper (minutes an instance may sit in
+   * 'loading'/'created' before it is recycled). Unset → the compiled default.
+   */
+  REAPER_LOADING_STUCK_MIN?: string;
 }
