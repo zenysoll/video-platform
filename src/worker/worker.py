@@ -26,11 +26,16 @@ CONTROL_PLANE_URL = os.environ["CONTROL_PLANE_URL"].rstrip("/")
 STREAM_ID         = os.environ["STREAM_ID"]
 WORKER_SECRET     = os.environ["WORKER_SECRET"]
 TOTAL_VIDEOS      = int(os.environ.get("TOTAL_VIDEOS", "0"))
+# Quality mode set by the control plane at provision time. Selects which workflow
+# variant the control plane serves and which checkpoint bootstrap put on disk.
+MODE              = os.environ.get("MODE", "flex")
 # HF_TOKEN is used only by bootstrap.sh (model download), not needed here.
 
 COMFY_URL         = os.getenv("COMFY_URL", "http://127.0.0.1:8188")
 WORKFLOW_PATH     = "/workspace/workflow.json"
-WORKFLOW_URL      = f"{CONTROL_PLANE_URL}/worker/workflow.json"
+# ?mode= must ride along on every per-job re-fetch — without it a max instance
+# would hot-update itself back onto the flex workflow mid-stream.
+WORKFLOW_URL      = f"{CONTROL_PLANE_URL}/worker/workflow.json?mode={MODE}"
 COMFY_OUTPUT_DIR  = "/workspace/ComfyUI/output"
 
 POLL_INTERVAL_SEC = 10   # seconds between job claim attempts when queue is empty
@@ -176,7 +181,12 @@ def frames_for_duration(fps: int, duration_secs: int) -> int:
     return frames
 
 
-LTX_CHECKPOINT = "ltx-2.3-22b-distilled-1.1.safetensors"
+# Must match the file bootstrap-models.sh downloaded for this MODE — the sound
+# path below feeds it to LTXVAudioVAELoader, which reads from disk by filename.
+LTX_CHECKPOINT = (
+    "ltx-2.3-22b-dev.safetensors" if MODE == "max"
+    else "ltx-2.3-22b-distilled-1.1.safetensors"
+)
 
 
 def build_workflow(job: dict) -> dict:

@@ -22,6 +22,8 @@ import bootstrapSh from './worker/bootstrap.sh';
 import bootstrapModelsSh from './worker/bootstrap-models.sh';
 import workerPy from './worker/worker.py';
 import workflowJson from './worker/workflow.json';
+import workflowMaxJson from './worker/workflow-max.json';
+import { parseQualityMode } from './config/modes.js';
 
 export default {
   // ── HTTP handler ─────────────────────────────────────────────────────────────
@@ -63,7 +65,13 @@ export default {
       });
     }
     if (path === '/worker/workflow.json') {
-      return new Response(JSON.stringify(workflowJson), {
+      // ?mode=max serves the dev-checkpoint workflow (24 steps, CFG 3.5, real
+      // negative prompt). Unknown/absent mode falls back to flex so old workers
+      // that fetch without the query keep working.
+      const workflow = parseQualityMode(url.searchParams.get('mode')) === 'max'
+        ? workflowMaxJson
+        : workflowJson;
+      return new Response(JSON.stringify(workflow), {
         headers: { 'Content-Type': 'application/json' },
       });
     }
@@ -152,6 +160,8 @@ export default {
       const { findOffers } = await import('./queues/stream-consumer.js');
       const vast = new VastClient(env.VAST_API_KEY, env.VAST_API_BASE_URL);
       const gpuCount = parseInt(url.searchParams.get('gpu_count') ?? '1', 10) || 1;
+      // ?mode=max inspects the max-mode pool (RTX PRO 6000 tiers, $2.50 ceiling).
+      const mode = parseQualityMode(url.searchParams.get('mode'));
 
       const benched = await env.DB
         .prepare(`SELECT host_id, host_ip, reason, failed_at FROM host_failures WHERE failed_at >= ? ORDER BY failed_at DESC`)
@@ -160,7 +170,7 @@ export default {
         .catch(() => ({ results: [] as unknown[] }));
 
       try {
-        const offers = await findOffers(env, vast, gpuCount);
+        const offers = await findOffers(env, vast, gpuCount, mode);
         // The order the provisioner would actually try, one attempt per host.
         const seen = new Set<number>();
         const plan = [];
@@ -177,6 +187,7 @@ export default {
         }
         return Response.json({
           image: env.WORKER_IMAGE ?? '(default: ghcr.io)',
+          mode,
           offers_found: offers.length,
           distinct_hosts: plan.length,
           benched_hosts: benched.results,

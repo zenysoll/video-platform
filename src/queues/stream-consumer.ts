@@ -24,6 +24,7 @@ import { generatePromptBatch, persistPromptFingerprints } from '../prompts/pipel
 import { buildPriorAvoidLabelsForStream } from '../prompts/fingerprint.js';
 import { VastClient } from '../vast/client.js';
 import type { VastOffer } from '../vast/types.js';
+import { MODES, parseQualityMode, type ModeConfig, type QualityMode } from '../config/modes.js';
 import { generateId, nowIso } from '../lib/idempotency.js';
 import { logger } from '../lib/logger.js';
 
@@ -34,10 +35,11 @@ const PRIOR_BRIEF_AVOID_LIMIT = 85;
 /** Prior final prompt excerpts — catch same plot, different wording. */
 const PRIOR_PROMPT_SNIPPET_LIMIT = 18;
 
-// GPU requirements for LTX-2.3 (22B model, 46.1 GB on disk, ~30 GB VRAM at runtime)
-const GPU_MIN_VRAM_GB = 30;          // RTX 5090 = 32 GB; 30 gives safety margin vs off-by-one floats
-const GPU_MIN_RAM_GB = 48;           // system RAM — use 48 so cheapest RTX 5090 (cpu_ram≈64 GB reported as ~64009 MB) passes the filter
-const GPU_MIN_DISK_GB = 120;         // 46 GB model + 9 GB Gemma + ComfyUI + workspace buffer (reduced from 200 — image pre-installs ComfyUI)
+// Per-mode GPU requirements (VRAM, RAM, disk, GPU tiers, budget ceiling, image,
+// checkpoint, workflow) live in src/config/modes.ts — flex keeps the historical
+// RTX 5090 values, max targets RTX PRO 6000 96GB. The constants below are
+// mode-INDEPENDENT host-quality floors and apply to every search.
+//
 // reliability2 score 0–1. Raised 0.98 → 0.99 after the 2026-07-21 outage: the host
 // that wedged two streams (402342, docker pull stalled behind a shared-IP Docker Hub
 // rate limit) scored 0.9884 — it passed 0.98 and, being the cheapest offer, was picked
@@ -46,23 +48,6 @@ const GPU_MIN_DISK_GB = 120;         // 46 GB model + 9 GB Gemma + ComfyUI + wor
 const GPU_MIN_RELIABILITY = 0.99;
 const GPU_MIN_INET_DOWN = 1500;      // 1500 Mbps ≈ 190 MB/s — filters slow hosts (was 500: let in 525-790 Mbps hosts that made the 55 GB download crawl). Verified supply stays ~37 offers at this floor.
 const GPU_MIN_CUDA_MAX_GOOD = 12.8;  // host driver must support CUDA ≥12.8 (cu128 / Blackwell sm_120). All current RTX 5090 hosts pass; future-proofs against old-driver hosts.
-const GPU_PREFERRED = 'RTX 5090';   // Vast.ai uses spaces in GPU names
-
-// Pre-built image with PyTorch nightly cu128, ComfyUI + LTXVideo + VideoHelperSuite.
-// Cold-start: ~5-7 min (R2 model download) vs ~20 min (full bootstrap from scratch).
-// Build: docker build -t YOUR_DOCKERHUB/comfyui-ltx:cu128 . && docker push ...
-// After pushing, replace the tag below with your Docker Hub image.
-// Pre-built worker image on GitHub Container Registry.
-//
-// NOT Docker Hub: anonymous Docker Hub pulls are rate-limited per source IP
-// (10/hour, 100/6h). Multi-tenant Vast hosts run every container behind one shared
-// IP, so neighbours burn the quota and our pull wedges mid-layer — the instance sits
-// in 'loading' at "Pulling from …" forever. ghcr.io serves public images unmetered.
-//
-// Built from ./Dockerfile by .github/workflows/build-worker-image.yml.
-// Bakes torch cu128 + ComfyUI + LTX nodes, so bootstrap only fetches weights:
-// cold start ~5 min instead of ~20.
-const DEFAULT_WORKER_IMAGE = 'ghcr.io/zenysoll/comfyui-ltx:cu128';
 
 /**
  * Resolve the worker image, overridable via the WORKER_IMAGE var in wrangler.toml.
@@ -70,10 +55,11 @@ const DEFAULT_WORKER_IMAGE = 'ghcr.io/zenysoll/comfyui-ltx:cu128';
  * Env-driven so the image can be rolled forward or back with a config change
  * instead of a code deploy — which matters most during the Docker Hub → ghcr.io
  * cutover, where the control plane must keep provisioning on the old image until
- * the new one is built, pushed and confirmed public.
+ * the new one is built, pushed and confirmed public. Both modes default to the
+ * same ghcr.io image (see modes.ts) — max differs only in checkpoint + workflow.
  */
-function resolveWorkerImage(env: Env): string {
-  return env.WORKER_IMAGE?.trim() || DEFAULT_WORKER_IMAGE;
+function resolveWorkerImage(env: Env, cfg: ModeConfig): string {
+  return env.WORKER_IMAGE?.trim() || cfg.workerImage;
 }
 
 export async function handleStreamBatch(
@@ -114,7 +100,7 @@ async function processStreamBatch(msg: StreamLaunchMessage, env: Env): Promise<v
     .first<{
       id: string; state: string; total_videos: number;
       duration_secs: number; videos_queued: number;
-      name: string; gpu_count: number;
+      name: string; gpu_count: number; quality_mode: string;
     }>();
 
   if (!stream) {
@@ -329,7 +315,7 @@ async function recentlyFailed(env: Env): Promise<{ hosts: number[]; ips: string[
 
 async function provisionVastInstance(
   streamId: string,
-  stream: { id: string; state: string; total_videos: number; duration_secs: number; gpu_count: number },
+  stream: { id: string; state: string; total_videos: number; duration_secs: number; gpu_count: number; quality_mode: string },
   env: Env,
 ): Promise<void> {
   // ── Idempotency guard ────────────────────────────────────────────────────────
@@ -391,28 +377,30 @@ async function provisionVastInstance(
 
 async function runProvisioning(
   streamId: string,
-  stream: { id: string; state: string; total_videos: number; duration_secs: number; gpu_count: number },
+  stream: { id: string; state: string; total_videos: number; duration_secs: number; gpu_count: number; quality_mode: string },
   env: Env,
 ): Promise<void> {
   const vast = new VastClient(env.VAST_API_KEY, env.VAST_API_BASE_URL);
   const gpuCount = stream.gpu_count ?? 1;
+  const mode = parseQualityMode(stream.quality_mode);
 
-  const offers = await findOffers(env, vast, gpuCount, streamId);
+  const offers = await findOffers(env, vast, gpuCount, mode, streamId);
 
   if (offers.length === 0) {
-    logger.error('no suitable GPU offers found — will retry on next reaper run', { stream_id: streamId });
+    logger.error('no suitable GPU offers found — will retry on next reaper run', { stream_id: streamId, mode });
     // Keep 'pending' — reaper will reset and re-enqueue after PROVISION_TIMEOUT_MIN.
     return;
   }
 
   logger.info('found GPU offers', {
     stream_id: streamId,
+    mode,
     count: offers.length,
     distinct_hosts: new Set(offers.map(o => o.host_id)).size,
     best_geo: (offers[0] as {geolocation?:string}).geolocation ?? '?',
   });
 
-  await startOnBestOffer(streamId, stream, env, vast, offers, gpuCount);
+  await startOnBestOffer(streamId, stream, env, vast, offers, gpuCount, mode);
 }
 
 /**
@@ -426,8 +414,32 @@ export async function findOffers(
   env: Env,
   vast: VastClient,
   gpuCount: number,
+  mode: QualityMode = 'flex',
   streamId = 'debug',
 ): Promise<VastOffer[]> {
+  const cfg = MODES[mode];
+
+  // Budget ceiling — applied client-side after EVERY tier search (Vast.ai has no
+  // reliable max-price filter). Applied per tier, not once at the end, so a tier
+  // whose only offers are over budget correctly falls through to the next tier
+  // instead of masking it with an unaffordable non-empty result.
+  //
+  // maxDph is PER GPU: offer dph_total covers all GPUs of the offer, so a flat
+  // ceiling would reject every multi-GPU offer (4× RTX 5090 ≈ $1.37/hr total vs
+  // the $1.00 flex ceiling) and deadlock ×2/×4 streams that provisioned fine
+  // before the ceiling existed.
+  const dphCeiling = cfg.maxDph * gpuCount;
+  const withinBudget = (offers: VastOffer[]): VastOffer[] => {
+    const kept = offers.filter(o => o.dph_total <= dphCeiling);
+    if (kept.length !== offers.length) {
+      logger.info('vast offers over budget ceiling dropped', {
+        stream_id: streamId, mode, max_dph: dphCeiling,
+        dropped: offers.length - kept.length, remaining: kept.length,
+      });
+    }
+    return kept;
+  };
+
   // Parse excluded machine IDs from env (comma-separated integers).
   const excludedMachines = parseIdList(env.VAST_EXCLUDED_MACHINES);
 
@@ -439,7 +451,7 @@ export async function findOffers(
   const benched = await recentlyFailed(env);
   const excludedHosts = [...parseIdList(env.VAST_EXCLUDED_HOSTS), ...benched.hosts];
 
-  // Search: prefer RTX 5090, fall back to any GPU meeting minimums.
+  // Search: prefer the mode's GPU tiers in order, fall back to any GPU meeting minimums.
   // Exclude CN: local inet_down looks fast but R2 throughput from China is ~20 MB/s
   // (vs 150+ MB/s from US/EU), causing 2–3× slower cold starts.
   //
@@ -449,9 +461,9 @@ export async function findOffers(
   // or deverified (the CDI culprits); filtering them out costs no price premium and
   // still leaves 25-30 offers for 1/2/4-GPU.
   const baseQuery = {
-    min_gpu_ram: GPU_MIN_VRAM_GB,
-    min_cpu_ram: GPU_MIN_RAM_GB,   // system RAM doesn't scale with GPU count — it's one machine
-    min_disk_space: GPU_MIN_DISK_GB,
+    min_gpu_ram: cfg.minGpuRamGb,
+    min_cpu_ram: cfg.minCpuRamGb,   // system RAM doesn't scale with GPU count — it's one machine
+    min_disk_space: cfg.diskGb,
     min_reliability: GPU_MIN_RELIABILITY,
     min_inet_down: GPU_MIN_INET_DOWN,
     min_cuda_max_good: GPU_MIN_CUDA_MAX_GOOD,
@@ -467,24 +479,38 @@ export async function findOffers(
     limit: 25,
   };
 
-  logger.info('searching Vast.ai GPU offers', { stream_id: streamId, gpu_count: gpuCount });
+  // gpuTiers is never empty (compile-time data in modes.ts).
+  const gpuPreferred = cfg.gpuTiers[0]!;
 
-  // Tier 1: verified RTX 5090.
-  let offers = await vast.searchOffers({ ...baseQuery, gpu_name: GPU_PREFERRED });
+  logger.info('searching Vast.ai GPU offers', { stream_id: streamId, mode, gpu_count: gpuCount });
+
+  // Tier 1: verified preferred GPU (per-mode: RTX 5090 / RTX PRO 6000 WS).
+  let offers = withinBudget(await vast.searchOffers({ ...baseQuery, gpu_name: gpuPreferred }));
+
+  // Tier 1b: further verified GPU names for this mode (max: the server SKU of the
+  // same 96 GB board). Same silicon, so no quality trade-off — only supply.
+  for (const gpuName of cfg.gpuTiers.slice(1)) {
+    if (offers.length > 0) break;
+    logger.warn('no verified offers on preferred GPU, trying next mode tier', {
+      stream_id: streamId, mode, gpu_name: gpuName, gpu_count: gpuCount,
+    });
+    offers = withinBudget(await vast.searchOffers({ ...baseQuery, gpu_name: gpuName }));
+  }
 
   // Tier 2: verified, any GPU meeting minimums.
   if (offers.length === 0) {
-    logger.warn('no verified RTX 5090 available, searching verified fallback GPUs', { stream_id: streamId, gpu_count: gpuCount });
-    offers = await vast.searchOffers(baseQuery);
+    logger.warn('no verified preferred GPUs available, searching verified fallback GPUs', { stream_id: streamId, mode, gpu_count: gpuCount });
+    offers = withinBudget(await vast.searchOffers(baseQuery));
   }
 
-  // Tier 3 (last resort): RTX 5090 WITHOUT the verified requirement. Only reached when
-  // verified supply is momentarily exhausted — better than deadlocking the stream. An
-  // unverified host that CDI-fails is now cheap: bootstrap fast-fails → provision-failed
-  // destroys it immediately (Fix), and the reaper orphan sweep is the final backstop.
+  // Tier 3 (last resort): preferred GPU WITHOUT the verified requirement. Only reached
+  // when verified supply is momentarily exhausted — better than deadlocking the stream.
+  // An unverified host that CDI-fails is now cheap: bootstrap fast-fails →
+  // provision-failed destroys it immediately (Fix), and the reaper orphan sweep is the
+  // final backstop.
   if (offers.length === 0) {
-    logger.warn('no verified offers at all — last-resort unverified RTX 5090 search', { stream_id: streamId, gpu_count: gpuCount });
-    offers = await vast.searchOffers({ ...baseQuery, verified: false, gpu_name: GPU_PREFERRED });
+    logger.warn('no verified offers at all — last-resort unverified preferred-GPU search', { stream_id: streamId, mode, gpu_count: gpuCount });
+    offers = withinBudget(await vast.searchOffers({ ...baseQuery, verified: false, gpu_name: gpuPreferred }));
   }
 
   // Tier 4 (safety valve): drop the *dynamic* host cooldown, keeping the permanent
@@ -495,12 +521,12 @@ export async function findOffers(
     logger.warn('all hosts benched — retrying without the failure cooldown', {
       stream_id: streamId, benched: excludedHosts.length,
     });
-    offers = await vast.searchOffers({
+    offers = withinBudget(await vast.searchOffers({
       ...baseQuery,
       excluded_host_ids: parseIdList(env.VAST_EXCLUDED_HOSTS),
       excluded_host_ips: [],
-      gpu_name: GPU_PREFERRED,
-    });
+      gpu_name: gpuPreferred,
+    }));
   }
 
   return offers;
@@ -514,12 +540,14 @@ async function startOnBestOffer(
   vast: VastClient,
   offers: VastOffer[],
   gpuCount: number,
+  mode: QualityMode,
 ): Promise<void> {
   const controlPlaneUrl = env.CONTROL_PLANE_URL;
+  const cfg = MODES[mode];
 
   // Use slim bootstrap (models-only) when running a pre-built Docker image,
   // full bootstrap otherwise. Switch via the WORKER_IMAGE var in wrangler.toml.
-  const workerImage = resolveWorkerImage(env);
+  const workerImage = resolveWorkerImage(env, cfg);
   const isPrebuiltImage = !workerImage.startsWith('pytorch/pytorch');
   const bootstrapUrl = isPrebuiltImage
     ? `${controlPlaneUrl}/worker/bootstrap-models.sh`
@@ -535,6 +563,9 @@ async function startOnBestOffer(
     `export WORKER_SECRET='${env.WORKER_SECRET}'`,
     `export TOTAL_VIDEOS='${stream.total_videos}'`,
     `export GPU_COUNT='${gpuCount}'`,
+    // Quality mode — bootstrap picks the checkpoint and workflow variant from this;
+    // worker.py appends it as ?mode= when re-fetching the workflow per job.
+    `export MODE='${cfg.bootstrapMode}'`,
     `export HF_TOKEN='${env.HF_TOKEN ?? ''}'`,
     // R2 model bucket credentials — fast model download (~500 MB/s vs HF's 11 MB/s).
     // Set R2_MODEL_KEY_ID + R2_MODEL_SECRET secrets once credentials are created in CF dashboard.
@@ -571,7 +602,7 @@ async function startOnBestOffer(
       });
       instance = await vast.startInstance(usedOffer.id, {
         image: workerImage,
-        disk: GPU_MIN_DISK_GB,
+        disk: cfg.diskGb,
         label: `stream-${streamId.slice(0, 8)}`,
         onstart,
       });
@@ -608,6 +639,7 @@ async function startOnBestOffer(
 
   logger.info('vast instance started', {
     stream_id: streamId,
+    mode,
     instance_id: instance.id,
     gpu: usedOffer.gpu_name,
     geo: (usedOffer as {geolocation?:string}).geolocation ?? '?',

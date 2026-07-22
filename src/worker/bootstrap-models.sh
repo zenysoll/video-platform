@@ -14,6 +14,8 @@
 #
 # Environment variables injected by the control plane:
 #   CONTROL_PLANE_URL, STREAM_ID, WORKER_SECRET, TOTAL_VIDEOS
+#   MODE — 'flex' (distilled ckpt) or 'max' (22B dev ckpt + workflow-max);
+#          defaults to flex so instances started by an older control plane boot fine
 #   R2_MODEL_KEY_ID, R2_MODEL_SECRET — Cloudflare R2 credentials
 #   HF_TOKEN — HuggingFace token (fallback if R2 empty)
 
@@ -23,7 +25,9 @@ export HF_HUB_ENABLE_HF_TRANSFER=1
 
 LOG() { echo "[bootstrap] $(date -u +%H:%M:%S) $*"; }
 
-LOG "Starting model-only bootstrap for stream ${STREAM_ID:-MISSING}"
+MODE="${MODE:-flex}"
+
+LOG "Starting model-only bootstrap for stream ${STREAM_ID:-MISSING} (mode=${MODE})"
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 COMFY_DIR=/workspace/ComfyUI
@@ -85,18 +89,26 @@ r2_available() {
   [ -n "${R2_MODEL_KEY_ID:-}" ] && [ -n "${R2_MODEL_SECRET:-}" ]
 }
 
-# ── LTX-2.3 distilled v1.1 — 46 GB ──────────────────────────────────────────
-LTX_CKPT="$MODEL_DIR/checkpoints/ltx-2.3-22b-distilled-1.1.safetensors"
-LTX_MIN=40000000000
+# ── LTX-2.3 checkpoint — distilled v1.1 (flex, ~46 GB) or dev (max, ~42 GB) ──
+# Min-size gates catch truncated downloads: distilled must exceed 40 GB, the
+# bf16 dev checkpoint 38 GB.
+if [ "$MODE" = "max" ]; then
+  LTX_FILE="ltx-2.3-22b-dev.safetensors"
+  LTX_MIN=38000000000
+else
+  LTX_FILE="ltx-2.3-22b-distilled-1.1.safetensors"
+  LTX_MIN=40000000000
+fi
+LTX_CKPT="$MODEL_DIR/checkpoints/$LTX_FILE"
 
 if [ -f "$LTX_CKPT" ] && [ "$(stat -c%s "$LTX_CKPT" 2>/dev/null || echo 0)" -ge $LTX_MIN ]; then
   LOG "LTX-2.3 checkpoint already present."
 else
-  LOG "Downloading LTX-2.3 (~46 GB)..."
+  LOG "Downloading LTX-2.3 ($LTX_FILE)..."
   LTX_OK=false
 
   if r2_available; then
-    if r2_cp "checkpoints/ltx-2.3-22b-distilled-1.1.safetensors" "$LTX_CKPT"; then
+    if r2_cp "checkpoints/$LTX_FILE" "$LTX_CKPT"; then
       LTX_OK=true
       LOG "LTX-2.3 downloaded from R2."
     else
@@ -110,7 +122,7 @@ import os, time
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 from huggingface_hub import hf_hub_download
 t0 = time.time()
-hf_hub_download('Lightricks/LTX-2.3', 'ltx-2.3-22b-distilled-1.1.safetensors',
+hf_hub_download('Lightricks/LTX-2.3', '$LTX_FILE',
     local_dir='$MODEL_DIR/checkpoints')
 print(f'[bootstrap] LTX done in {(time.time()-t0)/60:.1f}min', flush=True)
 "
@@ -167,11 +179,11 @@ if r2_available; then
     export AWS_ACCESS_KEY_ID="$R2_MODEL_KEY_ID"
     export AWS_SECRET_ACCESS_KEY="$R2_MODEL_SECRET"
     # Only upload if not already in R2 (check size)
-    LTX_R2_SIZE=$(aws s3 ls "s3://${R2_BUCKET}/checkpoints/ltx-2.3-22b-distilled-1.1.safetensors" \
+    LTX_R2_SIZE=$(aws s3 ls "s3://${R2_BUCKET}/checkpoints/$LTX_FILE" \
       --endpoint-url "$R2_ENDPOINT" 2>/dev/null | awk '{print $3}' || echo 0)
-    if [ "${LTX_R2_SIZE:-0}" -lt 40000000000 ]; then
-      LOG "R2 upload: seeding LTX-2.3 checkpoint..."
-      aws s3 cp "$LTX_CKPT" "s3://${R2_BUCKET}/checkpoints/ltx-2.3-22b-distilled-1.1.safetensors" \
+    if [ "${LTX_R2_SIZE:-0}" -lt $LTX_MIN ]; then
+      LOG "R2 upload: seeding LTX-2.3 checkpoint ($LTX_FILE)..."
+      aws s3 cp "$LTX_CKPT" "s3://${R2_BUCKET}/checkpoints/$LTX_FILE" \
         --endpoint-url "$R2_ENDPOINT" --no-progress \
         && LOG "R2 upload: LTX-2.3 done." || LOG "R2 upload: LTX-2.3 FAILED (non-fatal)"
     fi
@@ -188,9 +200,11 @@ if r2_available; then
 fi
 
 # ── Download worker scripts from control plane ────────────────────────────────
+# The mode query selects the workflow variant (flex → workflow.json graph,
+# max → workflow-max.json: dev ckpt, 24 steps, CFG 3.5, real negative prompt).
 LOG "Downloading worker scripts..."
 wget -q -O /workspace/worker.py   "${CONTROL_PLANE_URL}/worker/worker.py"
-wget -q -O /workspace/workflow.json "${CONTROL_PLANE_URL}/worker/workflow.json"
+wget -q -O /workspace/workflow.json "${CONTROL_PLANE_URL}/worker/workflow.json?mode=${MODE}"
 
 # ── Multi-GPU setup ───────────────────────────────────────────────────────────
 GPU_COUNT="${GPU_COUNT:-1}"
