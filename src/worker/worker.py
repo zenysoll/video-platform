@@ -384,9 +384,15 @@ def film_finish(video_path: str) -> str:
         "curves=master='0/0.015 0.25/0.235 0.5/0.5 0.75/0.775 1/0.965',"
         "eq=saturation=0.88,"
         "noise=c0s=7:c0f=t+u,"
-        "split[b][h];"
-        "[h]lutyuv=y='if(gt(val,180),val,0)',colorchannelmixer=rr=1.0:gg=0.35:bb=0.15,gblur=sigma=24[hb];"
+        # Halation is done in RGB. The first version isolated highlights with a
+        # luma-only lut and screen-blended in yuv420p — but blend runs on ALL
+        # planes, and screen on the untouched U/V chroma planes floods the whole
+        # frame purple (shipped exactly that to a live test stream). In rgb24
+        # every channel is independent: keep red, cut green/blue, blur, screen.
+        "format=rgb24,split[b][h];"
+        "[h]lutrgb=r='if(gt(val,200),val,0)':g='if(gt(val,200),val*0.35,0)':b='if(gt(val,200),val*0.15,0)',gblur=sigma=24[hb];"
         "[b][hb]blend=all_mode=screen:all_opacity=0.25,"
+        "format=yuv420p,"
         "crop=iw-8:ih-8:4+3*sin(t*1.25):4+3*sin(t*1.625)"
     )
     cmd = [
