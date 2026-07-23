@@ -313,16 +313,27 @@ async function handleCustomHeightInput(
 async function sendFpsStep(
   chatId: number, messageId: number | undefined, data: WizardData, env: Env,
 ): Promise<void> {
+  // Max renders on Wan's fixed 16 fps grid and smooths via RIFE, so its two
+  // delivery options are grid-exact — arbitrary fps values would reintroduce
+  // the uneven-cadence judder the operator caught during live calibration.
+  const fpsKeyboard = data.quality_mode === 'max'
+    ? [
+        [{ text: '30 fps — smoothest (recommended)', callback_data: 'fps:30' }],
+        [{ text: '32 fps — every frame kept', callback_data: 'fps:32' }],
+      ]
+    : [[
+        { text: '24', callback_data: 'fps:24' },
+        { text: '30', callback_data: 'fps:30' },
+        { text: '60', callback_data: 'fps:60' },
+      ]];
   const body = {
     chat_id: chatId,
-    text: `Size: ${data.width}×${data.height}\n\nFPS:`,
+    text: data.quality_mode === 'max'
+      ? `Size: ${data.width}×${data.height}\n\nMotion smoothness (both are fluid; 30 is the calibrated default):`
+      : `Size: ${data.width}×${data.height}\n\nFPS:`,
     reply_markup: {
       inline_keyboard: [
-        [
-          { text: '24', callback_data: 'fps:24' },
-          { text: '30', callback_data: 'fps:30' },
-          { text: '60', callback_data: 'fps:60' },
-        ],
+        ...fpsKeyboard,
         [cancelButton()],
       ],
     },
@@ -338,6 +349,13 @@ async function handleFpsChoice(
   chatId: number, userId: number, fps: number, data: WizardData, env: Env,
   messageId?: number,
 ): Promise<void> {
+  // Per-mode whitelist: a stale/forged callback must not write an fps the
+  // render path has no grid for (max maps 30→RIFE×4, 32→RIFE×2 — nothing else).
+  const allowed = data.quality_mode === 'max' ? [30, 32] : [24, 30, 60];
+  if (!allowed.includes(fps)) {
+    await sendFpsStep(chatId, messageId, data, env);
+    return;
+  }
   data.fps = fps;
   await saveSession(env.DB, userId, 'wizard_duration', data);
   await sendDurationStep(chatId, messageId, fps, env);

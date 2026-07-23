@@ -85,8 +85,11 @@ export function validateLength(promptText: string): ValidationResult {
  * back degenerate, above 170 Gemini stuffed a field with a runaway phrase.
  */
 export function validateMaxLength(promptText: string): ValidationResult {
+  // Short-form band: research puts the sweet spot at 20-45 content words; with
+  // the trigger prefix and style bible the rendered total lands 30-55. Below 22
+  // a field came back degenerate; above 80 Gemini stuffed a runaway phrase.
   const words = promptText.split(/\s+/).filter(Boolean).length;
-  if (words < 40) return { ok: false, reason: `too short for max mode (${words} words)` };
-  if (words > 170) return { ok: false, reason: `too long for max mode (${words} words)` };
+  if (words < 22) return { ok: false, reason: `too short for max mode (${words} words)` };
+  if (words > 80) return { ok: false, reason: `too long for max mode (${words} words)` };
   return { ok: true };
 }

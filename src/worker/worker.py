@@ -30,6 +30,8 @@ TOTAL_VIDEOS      = int(os.environ.get("TOTAL_VIDEOS", "0"))
 # Quality mode set by the control plane at provision time. Selects which workflow
 # variant the control plane serves and which checkpoint bootstrap put on disk.
 MODE              = os.environ.get("MODE", "flex")
+# Delivery fps for max (30 default / 32 alt) — set from the first claimed job.
+RENDER_FPS        = 30
 # HF_TOKEN is used only by bootstrap.sh (model download), not needed here.
 
 COMFY_URL         = os.getenv("COMFY_URL", "http://127.0.0.1:8188")
@@ -198,16 +200,22 @@ def build_workflow(job: dict) -> dict:
     fps           = int(job.get("fps", 24))
     duration      = int(job.get("duration_secs", 5))
     seed          = random.randint(0, 2**32 - 1)
+    global RENDER_FPS
     if MODE in ("max", "max2"):  # max2 = legacy env on pre-collapse instances
-        # Wan 2.2 is a 16 fps-native model (81 frames = 5 s). Rendering the
-        # stream's 24 fps here would both overshoot Wan's trained frame budget
-        # and play back 1.5× too fast. Generate at native cadence; film_finish
-        # motion-interpolates 16 → 24 so the delivered file matches the product
-        # fps. Frame rule is 4k+1 for Wan's VAE (81, 113, …).
+        # Wan 2.2 is 16 fps-native (81 frames = 5 s); smooth output comes from
+        # in-graph RIFE interpolation, calibrated live with the operator:
+        #   fps 30 (default): RIFE ×4 → 64 fps grid → even fps=30 pick in the
+        #     finish (≤8 ms timing error — the naive ×2→32→drop-to-30 produced
+        #     visible speed-up/slow-down rhythm the operator caught immediately)
+        #   fps 32: RIFE ×2 → 32 fps container, zero dropped frames
         nframes = 16 * duration + 1
-        fps     = 16
+        rife_mult = 2 if fps == 32 else 4
+        combine_fps = 16 * rife_mult
+        RENDER_FPS = 32 if fps == 32 else 30
     else:
         nframes = frames_for_duration(fps, duration)
+        rife_mult = None
+        combine_fps = fps
     sound_enabled = bool(job.get("sound_enabled", False))
     if sound_enabled and MODE in ("max", "max2"):
         # The AV-latent injection below is LTX-specific: it adds LTXVAudio*
@@ -224,6 +232,8 @@ def build_workflow(job: dict) -> dict:
         "__HEIGHT__":     height,
         "__NUM_FRAMES__": nframes,
         "__FPS__":        fps,
+        "__RIFE_MULT__":  rife_mult if rife_mult else 1,
+        "__COMBINE_FPS__": combine_fps,
         "__SEED__":       seed,
     }
 
@@ -352,62 +362,35 @@ def wait_for_completion(prompt_id: str, timeout_sec: int = RENDER_TIMEOUT_SEC) -
 
 
 def film_finish(video_path: str) -> str:
-    """Film-emulation finish for max mode: grade → grain → halation → gate weave.
+    """Finish pass for max — the operator-approved "real video" look.
 
-    Why this exists: the top realism levers separating AI output from camera
-    footage are texture (grain reintroduces the fine random variation diffusion
-    smooths away) and color (a print-film S-curve with rolled-off highlights and
-    slight desaturation, instead of the oversaturated "AI poster" look). Halation
-    and a 2-3 px gate weave are the cheap lens/film artifacts on top. All CPU-side
-    ffmpeg — zero GPU cost. Order matters: grade first, grain after (grain must
-    not be re-colored), halation on the graded+grained image, weave last.
+    Calibrated live (2026-07-23): muted color (no vibrance — saturated output
+    reads as AI), lifted shadows with rolled highlights, clarity + fine sharpen
+    (the honest phone-camera tell), light denoise BEFORE sharpening, upscale to
+    delivery 1080×1920. fps handling matches the RIFE grid built in-graph:
+    stream fps 30 → even pick from the 64 fps grid; fps 32 → keep every frame.
 
-    Best-effort: on any failure the ORIGINAL file is uploaded — a missing finish
-    must never fail the job.
+    Best-effort: on any failure the ORIGINAL file is uploaded.
     """
     out = str(Path(video_path).with_suffix("")) + "_finish.mp4"
-    # One -vf/-filter_complex expression, built in stages:
-    #   curves       — gentle S-curve: lifted blacks (0→0.015), rolled highlights (1→0.965)
-    #   eq           — slight desaturation: kills the oversaturated AI-poster tell
-    #   noise        — luma-only temporal grain, subtle (c0s=7)
-    #   split+blend  — halation: red-weighted blurred highlights screened back at 25%
-    #   crop         — ±3 px sin-drift on non-harmonic frequencies (gate weave)
-    # Max delivers Wan's NATIVE 16 fps. The earlier mci interpolation to 24 fps
-    # warped geometry on complex motion (bent bicycle rim, live batch 1) — a
-    # worse artifact than low frame rate, which simply reads as film cadence.
-    pre = ""
-    fc = (
-        pre +
-        "curves=master='0/0.015 0.25/0.235 0.5/0.5 0.75/0.775 1/0.965',"
-        "eq=saturation=0.88,"
-        "noise=c0s=4:c0f=t+u,"
-        # Halation is done in RGB. The first version isolated highlights with a
-        # luma-only lut and screen-blended in yuv420p — but blend runs on ALL
-        # planes, and screen on the untouched U/V chroma planes floods the whole
-        # frame purple (shipped exactly that to a live test stream). In rgb24
-        # every channel is independent: keep red, cut green/blue, blur, screen.
-        "format=rgb24,split[b][h];"
-        # Halation lessons from two live batches, both verified by pixel probes:
-        # threshold 235 (200 caught entire bright skies and tinted them), and
-        # ADDITIVE blend of a pre-attenuated (×0.35) layer instead of screen with
-        # all_opacity — blend's opacity path shifted even untouched neutral grays
-        # (80,80,80)→(95,69,99). Addition of a black layer is exact identity, so
-        # the finish provably cannot recolor regions the halo doesn't reach.
-        "[h]lutrgb=r='if(gt(val,235),val,0)':g='if(gt(val,235),val*0.35,0)':b='if(gt(val,235),val*0.15,0)',gblur=sigma=16,"
-        "lutrgb=r='val*0.35':g='val*0.35':b='val*0.35'[hb];"
-        "[b][hb]blend=all_mode=addition,"
-        "format=yuv420p,"
-        "crop=iw-8:ih-8:4+3*sin(t*1.25):4+3*sin(t*1.625)"
+    fps_tail = ",fps=30" if RENDER_FPS == 30 else ""
+    vf = (
+        "hqdn3d=1.5:1.5:3:3,"
+        "curves=all='0/0 0.05/0.09 0.5/0.51 0.9/0.89 1/0.97',"
+        "unsharp=luma_msize_x=13:luma_msize_y=13:luma_amount=0.28,"
+        "cas=0.4,"
+        "eq=saturation=0.93,"
+        "scale=trunc(iw*1.5/2)*2:trunc(ih*1.5/2)*2:flags=lanczos" + fps_tail  # ×1.5 keeps EVERY aspect (704×1280→1056×1920, 1280×704→1920×1056, 960²→1440²)
     )
     cmd = [
         "ffmpeg", "-y", "-loglevel", "error", "-i", video_path,
-        "-filter_complex", fc,
-        "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-tune", "grain",
+        "-vf", vf,
+        "-c:v", "libx264", "-profile:v", "high", "-preset", "medium", "-crf", "18",
         "-pix_fmt", "yuv420p", "-c:a", "copy",
         out,
     ]
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
         if r.returncode != 0:
             log(f"film_finish ffmpeg failed (uploading original): {r.stderr[-300:]}")
             return video_path
@@ -419,7 +402,6 @@ def film_finish(video_path: str) -> str:
     except Exception as e:
         log(f"film_finish error (uploading original): {e}")
         return video_path
-
 
 
 def qc_check(video_path: str) -> str | None:

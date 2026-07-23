@@ -93,4 +93,6 @@ export interface Env {
    * 'loading'/'created' before it is recycled). Unset → the compiled default.
    */
   REAPER_LOADING_STUCK_MIN?: string;
+  /** '1' pauses every reaper sweep — calibration sessions on hand-driven instances. */
+  REAPER_PAUSED?: string;
 }

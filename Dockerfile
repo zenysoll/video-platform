@@ -66,6 +66,13 @@ RUN python -m pip install --force-reinstall \
     torch torchvision torchaudio \
     --index-url https://download.pytorch.org/whl/cu128
 
+# ── ComfyUI-Frame-Interpolation (RIFE) — smooth-motion stage for max mode ────
+# rife49 weights auto-download on first use (~50 MB, seconds).
+RUN git clone --depth 1 https://github.com/Fannovel16/ComfyUI-Frame-Interpolation \
+        /workspace/ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation && \
+    cd /workspace/ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation && \
+    python install.py
+
 # ── Model directories (weights downloaded at boot from R2) ───────────────────
 RUN mkdir -p \
     /workspace/ComfyUI/models/checkpoints \

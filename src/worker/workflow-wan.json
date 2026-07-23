@@ -175,10 +175,10 @@
     "class_type": "VHS_VideoCombine",
     "inputs": {
       "images": [
-        "15",
+        "17",
         0
       ],
-      "frame_rate": "__FPS__",
+      "frame_rate": "__COMBINE_FPS__",
       "loop_count": 0,
       "filename_prefix": "wan_output",
       "format": "video/h264-mp4",
@@ -187,6 +187,24 @@
       "save_metadata": false,
       "pingpong": false,
       "save_output": true
+    }
+  },
+  "17": {
+    "class_type": "RIFE VFI",
+    "inputs": {
+      "ckpt_name": "rife49.pth",
+      "frames": [
+        "15",
+        0
+      ],
+      "clear_cache_after_n_frames": 10,
+      "multiplier": "__RIFE_MULT__",
+      "fast_mode": true,
+      "ensemble": true,
+      "scale_factor": 1.0,
+      "dtype": "float16",
+      "torch_compile": false,
+      "batch_size": 1
     }
   }
 }

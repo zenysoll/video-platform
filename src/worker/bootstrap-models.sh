@@ -328,6 +328,12 @@ wget -q -O /workspace/workflow.json "${CONTROL_PLANE_URL}/worker/workflow.json?m
 GPU_COUNT="${GPU_COUNT:-1}"
 LOG "GPU_COUNT=${GPU_COUNT}"
 
+# ── RIFE node fallback install (until the image bakes it) ─────────────────────
+if [ "$MODE" != "flex" ] && [ ! -d /workspace/ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation ]; then
+  LOG "Installing ComfyUI-Frame-Interpolation (RIFE)..."
+  git clone -q --depth 1 https://github.com/Fannovel16/ComfyUI-Frame-Interpolation     /workspace/ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation     && (cd /workspace/ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation && python install.py > /tmp/rife_install.log 2>&1)     && LOG "RIFE installed." || LOG "RIFE install FAILED — max renders will fail validation"
+fi
+
 # ── Start ComfyUI instances (one per GPU) ──────────────────────────────────────
 # --lowvram is for flex only: 46 GB model on a 32 GB RTX 5090 needs layer
 # streaming. Max runs a 42 GB model on a 96 GB RTX PRO 6000, and max2 runs two

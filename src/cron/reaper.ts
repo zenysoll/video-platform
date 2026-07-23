@@ -138,6 +138,13 @@ function minutesFromEnv(raw: string | undefined, fallback: number): number {
 const HOST_BENCH_HOURS = 6;
 
 export async function runReaper(env: Env): Promise<void> {
+  // Operator kill-switch for calibration sessions: a live instance being driven
+  // by hand looks exactly like every failure mode the sweeps hunt (idle, no
+  // renders, unknown-to-DB) — pausing beats fighting the state machine.
+  if (env.REAPER_PAUSED === '1') {
+    logger.warn('reaper PAUSED via REAPER_PAUSED env — no sweeps run');
+    return;
+  }
   logger.info('reaper run started');
 
   // Sweeps 1-5, 2b, 7 run in parallel; sweep 6 (ghost alert) and sweep 8 (orphan

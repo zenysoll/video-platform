@@ -80,7 +80,7 @@ const LIGHTING_VOCAB = [
 // lives in natural, slightly imperfect color (the flex clip accidentally proved
 // this — its flat muted palette read as more real than the graded max output).
 export const MAX_STYLE_BIBLE =
-  'shot on 35mm film, documentary realism, natural true-to-life colors, shallow depth of field, slightly imperfect exposure';
+  'casual handheld phone video, natural true-to-life colors, slightly imperfect exposure';
 
 /** Structured fields Gemini must return for a max-mode clip. */
 interface MaxBriefFields {
@@ -146,14 +146,14 @@ function article(phrase: string): string {
  * prior-prompt avoid snippets stable across retries.
  */
 export function renderMaxParagraph(f: MaxBriefFields, mode: QualityMode = 'max'): string {
-  return MODE_TRIGGER_PREFIX[mode] + [
-    `${sentenceCase(f.subject)} ${f.action} ${f.setting}.`,
-    `The camera performs ${article(f.camera_move)} ${f.camera_move}, holding the subject in frame.`,
-    `${sentenceCase(f.lighting)}, with a palette of ${f.palette}.`,
-    `Shot on ${f.lens}.`,
-    `The mood is ${f.mood}.`,
-    `${sentenceCase(MAX_STYLE_BIBLE)}.`,
-  ].join(' ');
+  // SHORT prompt (~25-45 words). Live A/B on a fixed seed showed the 120-word
+  // paragraph and this compact form produce indistinguishable quality, and the
+  // research record (docs/research) says long prompts leak attributes between
+  // subjects — the "logical weirdness" class. palette/lens/mood are still
+  // GENERATED (they feed fingerprints and dedup) but no longer rendered.
+  return MODE_TRIGGER_PREFIX[mode] +
+    `${sentenceCase(f.subject)} ${f.action} ${f.setting}, ` +
+    `${f.lighting}, ${f.camera_move}, ${MAX_STYLE_BIBLE}`;
 }
 
 /**
