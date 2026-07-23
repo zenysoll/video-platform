@@ -14,6 +14,7 @@ import json
 import math
 import os
 import random
+import subprocess
 import sys
 import time
 import urllib.request
@@ -331,6 +332,58 @@ def wait_for_completion(prompt_id: str, timeout_sec: int = RENDER_TIMEOUT_SEC) -
     raise TimeoutError(f"ComfyUI render timed out after {timeout_sec}s")
 
 
+def film_finish(video_path: str) -> str:
+    """Film-emulation finish for max mode: grade → grain → halation → gate weave.
+
+    Why this exists: the top realism levers separating AI output from camera
+    footage are texture (grain reintroduces the fine random variation diffusion
+    smooths away) and color (a print-film S-curve with rolled-off highlights and
+    slight desaturation, instead of the oversaturated "AI poster" look). Halation
+    and a 2-3 px gate weave are the cheap lens/film artifacts on top. All CPU-side
+    ffmpeg — zero GPU cost. Order matters: grade first, grain after (grain must
+    not be re-colored), halation on the graded+grained image, weave last.
+
+    Best-effort: on any failure the ORIGINAL file is uploaded — a missing finish
+    must never fail the job.
+    """
+    out = str(Path(video_path).with_suffix("")) + "_finish.mp4"
+    # One -vf/-filter_complex expression, built in stages:
+    #   curves       — gentle S-curve: lifted blacks (0→0.015), rolled highlights (1→0.965)
+    #   eq           — slight desaturation: kills the oversaturated AI-poster tell
+    #   noise        — luma-only temporal grain, subtle (c0s=7)
+    #   split+blend  — halation: red-weighted blurred highlights screened back at 25%
+    #   crop         — ±3 px sin-drift on non-harmonic frequencies (gate weave)
+    fc = (
+        "curves=master='0/0.015 0.25/0.235 0.5/0.5 0.75/0.775 1/0.965',"
+        "eq=saturation=0.88,"
+        "noise=c0s=7:c0f=t+u,"
+        "split[b][h];"
+        "[h]lutyuv=y='if(gt(val,180),val,0)',colorchannelmixer=rr=1.0:gg=0.35:bb=0.15,gblur=sigma=24[hb];"
+        "[b][hb]blend=all_mode=screen:all_opacity=0.25,"
+        "crop=iw-8:ih-8:4+3*sin(t*1.25):4+3*sin(t*1.625)"
+    )
+    cmd = [
+        "ffmpeg", "-y", "-loglevel", "error", "-i", video_path,
+        "-filter_complex", fc,
+        "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-tune", "grain",
+        "-pix_fmt", "yuv420p", "-c:a", "copy",
+        out,
+    ]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if r.returncode != 0:
+            log(f"film_finish ffmpeg failed (uploading original): {r.stderr[-300:]}")
+            return video_path
+        if not Path(out).exists() or Path(out).stat().st_size < 1000:
+            log("film_finish produced empty output — uploading original")
+            return video_path
+        log(f"film_finish applied: {out}")
+        return out
+    except Exception as e:
+        log(f"film_finish error (uploading original): {e}")
+        return video_path
+
+
 def find_output_video(outputs: dict) -> str | None:
     """Extract the video file path from ComfyUI outputs."""
     for node_outputs in outputs.values():
@@ -481,6 +534,8 @@ def main() -> None:
                 raise FileNotFoundError("ComfyUI produced no output file")
 
             log(f"Render complete: {video_path}")
+            if MODE == "max":
+                video_path = film_finish(video_path)
             r2_key = upload_video(job_id, video_path)
             log(f"Uploaded to {r2_key}")
 

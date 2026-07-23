@@ -17,21 +17,33 @@
     "class_type": "CLIPTextEncode",
     "inputs": {
       "text": "__PROMPT__",
-      "clip": ["2", 0]
+      "clip": [
+        "2",
+        0
+      ]
     }
   },
   "4": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "text": "blurry, low quality, jpeg artifacts, deformed hands, extra limbs, morphing, flickering, watermark, text, subtitles, static camera, overexposed",
-      "clip": ["2", 0]
+      "text": "blurry, low quality, jpeg artifacts, deformed hands, extra limbs, morphing, flickering, watermark, text, subtitles, static camera, overexposed, oversaturated, overexposed, smooth plastic skin, airbrushed, beauty filter, 3D render, CGI, video game look, slow motion",
+      "clip": [
+        "2",
+        0
+      ]
     }
   },
   "5": {
     "class_type": "LTXVConditioning",
     "inputs": {
-      "positive": ["3", 0],
-      "negative": ["4", 0],
+      "positive": [
+        "3",
+        0
+      ],
+      "negative": [
+        "4",
+        0
+      ],
       "frame_rate": "__FPS__"
     }
   },
@@ -47,12 +59,15 @@
   "7": {
     "class_type": "LTXVScheduler",
     "inputs": {
-      "steps": 24,
+      "steps": 32,
       "max_shift": 2.05,
       "base_shift": 0.95,
       "stretch": true,
       "terminal": 0.1,
-      "latent": ["6", 0]
+      "latent": [
+        "6",
+        0
+      ]
     }
   },
   "8": {
@@ -64,39 +79,72 @@
   "9": {
     "class_type": "CFGGuider",
     "inputs": {
-      "model": ["1", 0],
-      "positive": ["5", 0],
-      "negative": ["5", 1],
-      "cfg": 3.5
+      "model": [
+        "1",
+        0
+      ],
+      "positive": [
+        "5",
+        0
+      ],
+      "negative": [
+        "5",
+        1
+      ],
+      "cfg": 3.0
     }
   },
   "10": {
     "class_type": "KSamplerSelect",
     "inputs": {
-      "sampler_name": "euler_cfg_pp"
+      "sampler_name": "euler"
     }
   },
   "11": {
     "class_type": "SamplerCustomAdvanced",
     "inputs": {
-      "noise": ["8", 0],
-      "guider": ["9", 0],
-      "sampler": ["10", 0],
-      "sigmas": ["7", 0],
-      "latent_image": ["6", 0]
+      "noise": [
+        "8",
+        0
+      ],
+      "guider": [
+        "9",
+        0
+      ],
+      "sampler": [
+        "10",
+        0
+      ],
+      "sigmas": [
+        "7",
+        0
+      ],
+      "latent_image": [
+        "6",
+        0
+      ]
     }
   },
   "12": {
     "class_type": "VAEDecode",
     "inputs": {
-      "samples": ["11", 0],
-      "vae": ["1", 2]
+      "samples": [
+        "11",
+        0
+      ],
+      "vae": [
+        "1",
+        2
+      ]
     }
   },
   "13": {
     "class_type": "VHS_VideoCombine",
     "inputs": {
-      "images": ["12", 0],
+      "images": [
+        "12",
+        0
+      ],
       "frame_rate": "__FPS__",
       "loop_count": 0,
       "filename_prefix": "ltxv_output",

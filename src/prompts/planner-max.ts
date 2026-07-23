@@ -57,8 +57,14 @@ const LIGHTING_VOCAB = [
  * Keeps 1000 diverse clips looking like one showcase reel instead of 1000
  * unrelated styles. Changing it is a deliberate product decision, not LLM drift.
  */
+// v2 note: grain and halation moved OUT of the prompt — the worker's ffmpeg
+// film-finish now adds them physically, and prompting for them double-dips.
+// "cinematic color grade" is deliberately GONE: live A/B frames showed it pushes
+// the model into an oversaturated teal-orange "AI poster" look, while realism
+// lives in natural, slightly imperfect color (the flex clip accidentally proved
+// this — its flat muted palette read as more real than the graded max output).
 export const MAX_STYLE_BIBLE =
-  '35mm film, shallow depth of field, fine grain, subtle halation, cinematic color grade';
+  'shot on 35mm film, documentary realism, natural true-to-life colors, shallow depth of field, slightly imperfect exposure';
 
 /** Structured fields Gemini must return for a max-mode clip. */
 interface MaxBriefFields {
@@ -72,25 +78,31 @@ interface MaxBriefFields {
   mood: string;
 }
 
-const MAX_SYSTEM = `You are a cinematography director writing shot briefs for a film-grade text-to-video model.
-Generate ONE unique clip concept as structured JSON. A real camera operator must be able to shoot it without asking a single question.
+const MAX_SYSTEM = `You are a documentary cinematographer writing shot briefs for a film-grade text-to-video model.
+Generate ONE unique clip concept as structured JSON. A real camera operator must be able to shoot it without asking a single question, and a viewer must believe it was FILMED, not generated.
 
 Output ONLY valid JSON, no markdown:
 {
-  "subject": "ONE concrete subject — detailed noun phrase (appearance, wardrobe, surface texture), 6-14 words",
-  "action": "present-tense verb phrase that continues the subject naturally; ONE single physical action, 5-12 words",
-  "setting": "prepositional phrase starting with in/on/at/inside/under — concrete place and time of day, 6-14 words",
+  "subject": "ONE concrete LIVING or WORKING subject — a person mid-task, an animal in motion, or a machine doing physical work; detailed noun phrase (appearance, wardrobe, surface texture), 6-14 words",
+  "action": "present-tense verb phrase; ONE physical action that VISIBLY CHANGES THE ENVIRONMENT — splashes, footprints, dust kicked up, steam released, sparks, fabric and hair moved by wind or motion, 5-12 words",
+  "setting": "prepositional phrase starting with in/on/at/inside/under — concrete place and time of day, INCLUDING a practical light source visible in frame (neon sign, market stall lamp, headlights, fire, window light, welding arc), 8-16 words",
   "camera_move": "EXACTLY one of: ${MAX_CAMERA_MOVES.join(' | ')}",
-  "lighting": "lighting description drawing on: ${LIGHTING_VOCAB.join(', ')} — adapt to the scene, 4-10 words",
-  "palette": "dominant colour palette of the frame, 3-8 words",
+  "lighting": "lighting description drawing on: ${LIGHTING_VOCAB.join(', ')} — natural and slightly imperfect, adapt to the scene, 4-10 words",
+  "palette": "natural true-to-life palette, 3-8 words — muted and believable, NEVER saturated poster colors or teal-orange grading",
   "lens": "lens/optics choice, e.g. '85mm prime with creamy bokeh', 3-8 words",
   "mood": "emotional tone, 2-6 words"
 }
 
+SCENE ARCHETYPES — draw scenes from these families (they read as real footage):
+street food being cooked at a night market; craftspeople at work (welding, pottery, carpentry, tailoring); animals moving through weather or water; rain, snow, fog or wind interacting with people and streets; markets, harbors, workshops, kitchens and garages lit by their own practical lights; vehicles and machines working (tractors, boats, trains, cranes); water in action — waves, rapids, washing, pouring.
+
+BANNED SCENES (they read as AI): shadows or silhouettes as the main subject; objects floating, hovering or bouncing with no visible cause; static beauty portraits with no action; empty landscapes with slow pans; abstract or decorative compositions; small trivial objects (coins, fruit, bread) without a human working with them.
+
 HARD RULES:
 - camera_move MUST be copied verbatim from the list — no variations, no combinations, no second move.
-- Lighting must agree with the energy of the action: calm action → soft/static light, kinetic action → hard or dynamic light.
-- One subject, one action, one setting. No crowds, no second character in focus.
+- The subject must physically interact with the environment — the interaction (splash, dust, steam, footprints, sparks) is what makes footage believable. It is REQUIRED, not optional.
+- Lighting must agree with the energy of the action: calm action → soft/static light, kinetic action → hard or dynamic light. Prefer imperfect, mixed, practical light over clean studio light.
+- One subject, one action, one setting. No crowds in focus, no second character in focus.
 - NEVER describe on-screen text: no captions, subtitles, signs with readable words, logos, watermarks, screens with UI.
 - NEVER state countable quantities of objects or people (no "three", "five", "a dozen" of anything).
 - No vague qualifiers (beautiful, stunning, amazing). Concrete nouns, physical verbs, material textures.
