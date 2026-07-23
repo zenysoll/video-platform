@@ -713,9 +713,11 @@ async function sweepStalledBatchChains(env: Env): Promise<number> {
  * with a 40-min window the reaper would destroy a legitimately-downloading first
  * boot AND false-bench a healthy host from the small RTX PRO 6000 pool, looping
  * until the 24 h give-up. 90 covers HF-fallback boot + first long render.
+ * Max2 gets the same 90: its first boot pulls ~38 GB of Wan 2.2 weights,
+ * possibly all from HuggingFace until R2 is seeded.
  */
 function stallRecycleMin(mode: string | null): number {
-  return mode === 'max' ? 90 : STALL_RECYCLE_MIN;
+  return mode === 'max' || mode === 'max2' ? 90 : STALL_RECYCLE_MIN;
 }
 
 async function sweepStalledStreams(env: Env): Promise<number> {

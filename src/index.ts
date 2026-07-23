@@ -23,6 +23,7 @@ import bootstrapModelsSh from './worker/bootstrap-models.sh';
 import workerPy from './worker/worker.py';
 import workflowJson from './worker/workflow.json';
 import workflowMaxJson from './worker/workflow-max.json';
+import workflowWanJson from './worker/workflow-wan.json';
 import { parseQualityMode } from './config/modes.js';
 
 export default {
@@ -66,10 +67,12 @@ export default {
     }
     if (path === '/worker/workflow.json') {
       // ?mode=max serves the dev-checkpoint workflow (24 steps, CFG 3.5, real
-      // negative prompt). Unknown/absent mode falls back to flex so old workers
-      // that fetch without the query keep working.
-      const workflow = parseQualityMode(url.searchParams.get('mode')) === 'max'
-        ? workflowMaxJson
+      // negative prompt); ?mode=max2 serves the Wan 2.2 dual-expert graph.
+      // Unknown/absent mode falls back to flex so old workers that fetch
+      // without the query keep working.
+      const workflowMode = parseQualityMode(url.searchParams.get('mode'));
+      const workflow = workflowMode === 'max' ? workflowMaxJson
+        : workflowMode === 'max2' ? workflowWanJson
         : workflowJson;
       return new Response(JSON.stringify(workflow), {
         headers: { 'Content-Type': 'application/json' },
@@ -160,7 +163,8 @@ export default {
       const { findOffers } = await import('./queues/stream-consumer.js');
       const vast = new VastClient(env.VAST_API_KEY, env.VAST_API_BASE_URL);
       const gpuCount = parseInt(url.searchParams.get('gpu_count') ?? '1', 10) || 1;
-      // ?mode=max inspects the max-mode pool (RTX PRO 6000 tiers, $2.50 ceiling).
+      // ?mode=max inspects the max-mode pool (RTX PRO 6000 tiers, $2.50 ceiling);
+      // ?mode=max2 inspects the Wan pool (RTX 5090, $1.00 ceiling, 140 GB disk).
       const mode = parseQualityMode(url.searchParams.get('mode'));
 
       const benched = await env.DB
@@ -215,11 +219,12 @@ export default {
         .bind(streamId).first<{ id: string; state: string; total_videos: number; duration_secs: number; gpu_count: number; quality_mode: string | null }>();
 
       // This route predates quality modes and hardcodes the flex profile (5090,
-      // flex workflow, no MODE export). Running it for a max stream would silently
-      // cross modes: max prompts rendered by the flex pipeline on flex hardware.
-      // Refuse rather than half-support it — the normal queue path handles max.
-      if (stream && stream.quality_mode === 'max') {
-        return Response.json({ error: 'debug provision does not support max streams — use /debug/re-enqueue' }, { status: 400 });
+      // flex workflow, no MODE export). Running it for a max/max2 stream would
+      // silently cross modes: their prompts rendered by the flex pipeline with
+      // the flex checkpoint. Refuse rather than half-support it — the normal
+      // queue path handles both.
+      if (stream && (stream.quality_mode === 'max' || stream.quality_mode === 'max2')) {
+        return Response.json({ error: `debug provision does not support ${stream.quality_mode} streams — use /debug/re-enqueue` }, { status: 400 });
       }
       if (!stream) return Response.json({ error: 'stream not found', logs }, { status: 404 });
 

@@ -12,9 +12,11 @@ import { enqueueStreamLaunch } from '../../queues/stream-producer.js';
 import { VastClient } from '../../vast/client.js';
 import { logger } from '../../lib/logger.js';
 
-/** 💎 prefix marks max-quality streams wherever a stream name is rendered. */
+/** 💎 (max) / 🎬 (max2) prefix marks quality streams wherever a stream name is rendered. */
 function modeBadge(s: { quality_mode?: string }): string {
-  return s.quality_mode === 'max' ? '💎 ' : '';
+  if (s.quality_mode === 'max') return '💎 ';
+  if (s.quality_mode === 'max2') return '🎬 ';
+  return '';
 }
 
 export async function handleStreamsCommand(chatId: number, userId: number, env: Env): Promise<void> {

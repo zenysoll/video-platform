@@ -15,6 +15,24 @@
 
 import { geminiGenerate, type GeminiConfig } from './gemini.js';
 import { MAX_AVOID_LABELS_IN_PROMPT, type PromptBrief } from './planner.js';
+import type { QualityMode } from '../config/modes.js';
+
+/**
+ * Per-mode trigger prefix prepended to the rendered paragraph.
+ *
+ * max2 runs the Wan 2.2 Instareal LoRA, which was trained with the literal
+ * trigger tokens "Instacam, amateur photo" — the LoRA activates far more
+ * reliably from its trigger words than from equivalent natural-language
+ * descriptors, and Wan weights the START of the prompt, so the tokens must
+ * lead the paragraph. flex/max carry an empty prefix: their rendered output
+ * stays byte-identical to the pre-max2 pipeline (stable fingerprints and
+ * avoid-snippets across the rollout).
+ */
+export const MODE_TRIGGER_PREFIX: Record<QualityMode, string> = {
+  flex: '',
+  max: '',
+  max2: 'Instacam, amateur photo, ',
+};
 
 /**
  * The only camera moves a brief may use — verbatim, exactly one per clip.
@@ -129,8 +147,8 @@ function article(phrase: string): string {
  * always render the same paragraph, which keeps fingerprints and the
  * prior-prompt avoid snippets stable across retries.
  */
-export function renderMaxParagraph(f: MaxBriefFields): string {
-  return [
+export function renderMaxParagraph(f: MaxBriefFields, mode: QualityMode = 'max'): string {
+  return MODE_TRIGGER_PREFIX[mode] + [
     `${sentenceCase(f.subject)} ${f.action} ${f.setting}.`,
     `The camera performs ${article(f.camera_move)} ${f.camera_move}, holding the subject in frame.`,
     `${sentenceCase(f.lighting)}, with a palette of ${f.palette}.`,
@@ -155,6 +173,10 @@ export async function generateMaxBrief(
   config: GeminiConfig,
   priorAvoidThemes: string[] = [],
   creativeAnchors?: string | null,
+  // 'max2' shares this whole planner; the only difference is the LoRA trigger
+  // prefix applied in renderMaxParagraph. Defaults to 'max' so existing call
+  // sites keep byte-identical output.
+  mode: QualityMode = 'max',
 ): Promise<PromptBrief> {
   const mergedAvoid = [...priorAvoidThemes, ...avoidThemes];
   const avoidStr = mergedAvoid.length > 0
@@ -211,7 +233,7 @@ Generate one unique cinematic clip brief.`;
     aesthetic: `${fields.mood}, ${fields.palette}`,
     subject: fields.subject,
     action: fields.action,
-    prompt: renderMaxParagraph(fields),
+    prompt: renderMaxParagraph(fields, mode),
     environment: fields.setting,
     camera: fields.camera_move,
   };

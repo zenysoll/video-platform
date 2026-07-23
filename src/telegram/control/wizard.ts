@@ -36,11 +36,12 @@ export async function startWizardFlow(
   await saveSession(env.DB, userId, 'wizard_quality', {});
   await telegramCall('sendMessage', {
     chat_id: chatId,
-    text: `Quality:\n\n⚡ Flex — fast and cheap, the current production look\n💎 Max — showcase quality at ~5× the cost per video`,
+    text: `Quality:\n\n⚡ Flex — fast and cheap, the current production look\n💎 Max — showcase quality at ~5× the cost per video\n🎬 Max2 — realism engine (Wan 2.2), flex-priced hardware`,
     reply_markup: {
       inline_keyboard: [
         [{ text: '⚡ Flex — fast & cheap', callback_data: 'qm:flex' }],
         [{ text: '💎 Max — showcase quality', callback_data: 'qm:max' }],
+        [{ text: '🎬 Max2 — realism engine', callback_data: 'qm:max2' }],
         [cancelButton()],
       ],
     },
@@ -167,9 +168,9 @@ async function handleQualityChoice(
   chatId: number, userId: number, choice: string, data: WizardData, env: Env,
   messageId?: number,
 ): Promise<void> {
-  // Only the two button payloads are valid — anything else (stale button,
+  // Only the three button payloads are valid — anything else (stale button,
   // forged callback) restarts the step instead of writing garbage into D1.
-  if (choice !== 'flex' && choice !== 'max') {
+  if (choice !== 'flex' && choice !== 'max' && choice !== 'max2') {
     await telegramCall('sendMessage', {
       chat_id: chatId, text: 'Please use the buttons to choose a quality mode.',
     }, env.CONTROL_BOT_TOKEN);
@@ -180,7 +181,7 @@ async function handleQualityChoice(
   await saveSession(env.DB, userId, 'wizard_name', data);
   await editMessage(
     chatId, messageId,
-    `Quality: ${choice === 'max' ? '💎 Max' : '⚡ Flex'}\n\nStream name:`,
+    `Quality: ${qualityLabel(choice)}\n\nStream name:`,
     undefined, env,
   );
 }
@@ -271,6 +272,8 @@ async function handleAspectRatioChoice(
   }
 
   data.aspect_ratio = ar;
+  // max2 deliberately falls through to the flex resolutions: Wan 2.2 fp8 runs on
+  // a 32 GB RTX 5090 where the 1080p-class max dimensions would be OOM-prone.
   const [w, h] = arToPixels(ar, data.quality_mode === 'max' ? 'max' : 'flex');
   data.width = w;
   data.height = h;
@@ -547,7 +550,7 @@ async function sendConfirmStep(
   const gpuCount = data.gpu_count ?? 1;
   const summary = [
     `Name:     ${data.name}`,
-    `Quality:  ${data.quality_mode === 'max' ? '💎 Max' : '⚡ Flex'}`,
+    `Quality:  ${qualityLabel(data.quality_mode ?? 'flex')}`,
     `Videos:   ${data.total_videos}`,
     `Size:     ${sizeStr}`,
     `FPS:      ${data.fps}`,
@@ -646,6 +649,15 @@ async function handleConfirmLaunch(
 
 function cancelButton() {
   return { text: 'Cancel', callback_data: 'wizard:cancel' };
+}
+
+/** One place for the operator-facing quality labels — wizard step + confirmation. */
+function qualityLabel(mode: 'flex' | 'max' | 'max2'): string {
+  switch (mode) {
+    case 'max':  return '💎 Max';
+    case 'max2': return '🎬 Max2';
+    default:     return '⚡ Flex';
+  }
 }
 
 async function editMessage(

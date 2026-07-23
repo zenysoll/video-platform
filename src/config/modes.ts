@@ -11,7 +11,7 @@
  * Decision record: docs/research/max-mode-architecture.md.
  */
 
-export type QualityMode = 'flex' | 'max';
+export type QualityMode = 'flex' | 'max' | 'max2';
 
 export interface ModeConfig {
   /**
@@ -45,7 +45,7 @@ export interface ModeConfig {
   /** Value exported as MODE in the instance onstart env — read by bootstrap-models.sh. */
   bootstrapMode: QualityMode;
   /** Which workflow the control plane serves for /worker/workflow.json?mode=… */
-  workflowFile: 'workflow.json' | 'workflow-max.json';
+  workflowFile: 'workflow.json' | 'workflow-max.json' | 'workflow-wan.json';
 }
 // NOTE: the checkpoint each mode downloads is derived from MODE inside
 // bootstrap-models.sh (a served shell script cannot read this record). Do not
@@ -79,6 +79,18 @@ export const MODES: Record<QualityMode, ModeConfig> = {
     bootstrapMode: 'max',
     workflowFile: 'workflow-max.json',
   },
+  max2: {
+    // Wan 2.2 T2V dual-expert (14B high-noise + 14B low-noise, fp8) on flex
+    // hardware: the experts run sequentially, so each fits a 32 GB RTX 5090.
+    gpuTiers: ['RTX 5090'],
+    minGpuRamGb: 30,   // RTX 5090 = 32 GB; fp8 expert ~14 GB resident at a time
+    minCpuRamGb: 48,
+    diskGb: 140,       // 2×14 GB experts + 6.7 GB UMT5 + VAE + loras + buffer
+    maxDph: 1.0,       // same 5090 pool and budget ceiling as flex
+    workerImage: GHCR_WORKER_IMAGE,
+    bootstrapMode: 'max2',
+    workflowFile: 'workflow-wan.json',
+  },
 };
 
 /**
@@ -87,5 +99,5 @@ export const MODES: Record<QualityMode, ModeConfig> = {
  * bad manual edit) degrades to the known-good pipeline instead of crashing.
  */
 export function parseQualityMode(raw: string | null | undefined): QualityMode {
-  return raw === 'max' ? 'max' : 'flex';
+  return raw === 'max' || raw === 'max2' ? raw : 'flex';
 }

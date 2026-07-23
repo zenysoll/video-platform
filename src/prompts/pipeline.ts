@@ -40,9 +40,10 @@ export interface PromptBatchMeta {
   /** Raw env string; parsed with parseDiversityMode. */
   diversityMode: string;
   /**
-   * Stream quality mode — 'max' switches to the structured cinematic planner
-   * (planner-max.ts). Fingerprinting, dedup and rerolls are identical in both
-   * modes; only the brief generator and the length window differ.
+   * Stream quality mode — 'max' and 'max2' switch to the structured cinematic
+   * planner (planner-max.ts; max2 additionally gets its LoRA trigger prefix).
+   * Fingerprinting, dedup and rerolls are identical in all modes; only the
+   * brief generator and the length window differ.
    */
   qualityMode?: QualityMode;
 }
@@ -98,6 +99,10 @@ export async function generatePromptBatch(
 
   const diversityMode = batchMeta ? parseDiversityMode(batchMeta.diversityMode) : parseDiversityMode('off');
   const qualityMode: QualityMode = batchMeta?.qualityMode ?? 'flex';
+  // max2 rides the whole max planner path (structured brief, server-rendered
+  // paragraph, max length window) — it differs only by the LoRA trigger prefix
+  // that generateMaxBrief applies when passed the mode.
+  const usesMaxPlanner = qualityMode === 'max' || qualityMode === 'max2';
 
   for (let i = 0; i < count; i++) {
     if (serviceOutage) break;
@@ -122,17 +127,25 @@ export async function generatePromptBatch(
     for (let attempt = 0; attempt < MAX_REROLLS; attempt++) {
       let brief: PromptBrief;
       try {
-        // Same call shape in both modes — the max planner throws on any
+        // Same call shape in all modes — the max planner throws on any
         // structural violation (bad JSON, off-list camera move) and lands in
         // the same reroll path as a flex parse failure.
-        const generate = qualityMode === 'max' ? generateMaxBrief : generateBrief;
-        brief = await generate(
-          usedThemes,
-          streamContext,
-          geminiConfig,
-          priorAvoidLabels,
-          creativeAnchors,
-        );
+        brief = usesMaxPlanner
+          ? await generateMaxBrief(
+              usedThemes,
+              streamContext,
+              geminiConfig,
+              priorAvoidLabels,
+              creativeAnchors,
+              qualityMode,
+            )
+          : await generateBrief(
+              usedThemes,
+              streamContext,
+              geminiConfig,
+              priorAvoidLabels,
+              creativeAnchors,
+            );
       } catch (err) {
         if (isTransientOutage(err)) {
           logger.warn('planner: transient outage detected, bailing batch', { attempt, error: String(err) });
@@ -169,7 +182,7 @@ export async function generatePromptBatch(
         continue;
       }
 
-      const lengthCheck = qualityMode === 'max'
+      const lengthCheck = usesMaxPlanner
         ? validateMaxLength(promptText)
         : validateLength(promptText);
       if (!lengthCheck.ok) {

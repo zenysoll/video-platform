@@ -40,7 +40,7 @@ export interface DbStream {
   bucket_id: string;
   name: string;
   state: string;
-  /** 'flex' | 'max' — parse with parseQualityMode, never trust the raw value. */
+  /** 'flex' | 'max' | 'max2' — parse with parseQualityMode, never trust the raw value. */
   quality_mode: string;
   total_videos: number;
   aspect_ratio: string | null;
