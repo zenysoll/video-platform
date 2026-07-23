@@ -476,14 +476,24 @@ async function sendBucketStep(
 ): Promise<void> {
   const buckets = await getBucketsForUser(env.DB, userId);
 
-  const bucketButtons = buckets.map(b => ([{
-    text: b.label,
+  // Default bucket by quality tier: a max stream should land in the 'max' bucket,
+  // a flex stream in 'flex'. The matching bucket is floated to the top and marked
+  // ✓ default so the operator taps through without mis-routing tiers.
+  const defaultName = data.quality_mode === 'max' ? 'max' : 'flex';
+  const ordered = [...buckets].sort((a, b) => {
+    const am = a.bucket_name === defaultName ? 0 : 1;
+    const bm = b.bucket_name === defaultName ? 0 : 1;
+    return am - bm;
+  });
+
+  const bucketButtons = ordered.map(b => ([{
+    text: b.bucket_name === defaultName ? `✓ ${b.label} (default for ${defaultName})` : b.label,
     callback_data: `bkt:${b.id}`,
   }]));
 
   const body = {
     chat_id: chatId,
-    text: `Select R2 bucket:`,
+    text: `Select R2 bucket (default for ${data.quality_mode === 'max' ? '💎 max' : '⚡ flex'} is on top):`,
     reply_markup: {
       inline_keyboard: [
         ...bucketButtons,
