@@ -200,7 +200,16 @@ def build_workflow(job: dict) -> dict:
     fps           = int(job.get("fps", 24))
     duration      = int(job.get("duration_secs", 5))
     seed          = random.randint(0, 2**32 - 1)
-    nframes       = frames_for_duration(fps, duration)
+    if MODE == "max2":
+        # Wan 2.2 is a 16 fps-native model (81 frames = 5 s). Rendering the
+        # stream's 24 fps here would both overshoot Wan's trained frame budget
+        # and play back 1.5× too fast. Generate at native cadence; film_finish
+        # motion-interpolates 16 → 24 so the delivered file matches the product
+        # fps. Frame rule is 4k+1 for Wan's VAE (81, 113, …).
+        nframes = 16 * duration + 1
+        fps     = 16
+    else:
+        nframes = frames_for_duration(fps, duration)
     sound_enabled = bool(job.get("sound_enabled", False))
     if sound_enabled and MODE == "max2":
         # The AV-latent injection below is LTX-specific: it adds LTXVAudio*
@@ -365,7 +374,13 @@ def film_finish(video_path: str) -> str:
     #   noise        — luma-only temporal grain, subtle (c0s=7)
     #   split+blend  — halation: red-weighted blurred highlights screened back at 25%
     #   crop         — ±3 px sin-drift on non-harmonic frequencies (gate weave)
+    # max2 renders at Wan's native 16 fps — motion-compensated interpolation up
+    # to the product's 24 fps runs FIRST so every later stage (grain, weave)
+    # operates on final-cadence frames. Never interpolate past 24: higher-fps
+    # smoothness is the soap-opera effect, the opposite of the film feel.
+    pre = "minterpolate=fps=24:mi_mode=mci:mc_mode=aobmc:vsbmc=1," if MODE == "max2" else ""
     fc = (
+        pre +
         "curves=master='0/0.015 0.25/0.235 0.5/0.5 0.75/0.775 1/0.965',"
         "eq=saturation=0.88,"
         "noise=c0s=7:c0f=t+u,"

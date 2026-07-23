@@ -274,7 +274,10 @@ async function handleAspectRatioChoice(
   data.aspect_ratio = ar;
   // max2 deliberately falls through to the flex resolutions: Wan 2.2 fp8 runs on
   // a 32 GB RTX 5090 where the 1080p-class max dimensions would be OOM-prone.
-  const [w, h] = arToPixels(ar, data.quality_mode === 'max' ? 'max' : 'flex');
+  const [w, h] = arToPixels(
+    ar,
+    data.quality_mode === 'max' || data.quality_mode === 'max2' ? data.quality_mode : 'flex',
+  );
   data.width = w;
   data.height = h;
   await saveSession(env.DB, userId, 'wizard_fps', data);
@@ -678,13 +681,24 @@ async function editMessage(
 // Max renders 1080p-class: the entire cost case for the mode is "pay ~5× for
 // showcase quality", and 24 steps at flex resolution would waste that premium.
 // Dimensions stay multiples of 32 (LTX latent constraint) — hence 1088, not 1080.
-function arToPixels(ar: string, mode: 'flex' | 'max' = 'flex'): [number, number] {
+function arToPixels(ar: string, mode: 'flex' | 'max' | 'max2' = 'flex'): [number, number] {
   if (mode === 'max') {
     switch (ar) {
       case '9:16':  return [1088, 1920];
       case '16:9':  return [1920, 1088];
       case '1:1':   return [1440, 1440];
       default:      return [1440, 1440];
+    }
+  }
+  // Wan 2.2 A14B is 720p-native: pushing it to 1080p-class both overruns its
+  // trained resolution and roughly doubles render time on the 5090. Multiples
+  // of 16 (Wan VAE stride).
+  if (mode === 'max2') {
+    switch (ar) {
+      case '9:16':  return [704, 1280];
+      case '16:9':  return [1280, 704];
+      case '1:1':   return [960, 960];
+      default:      return [960, 960];
     }
   }
   switch (ar) {

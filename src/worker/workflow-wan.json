@@ -1,3 +1,81 @@
 {
-  "__placeholder__": "wan graph installed separately"
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": { "unet_name": "wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors", "weight_dtype": "default" }
+  },
+  "2": {
+    "class_type": "UNETLoader",
+    "inputs": { "unet_name": "wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors", "weight_dtype": "default" }
+  },
+  "3": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": { "model": ["1", 0], "lora_name": "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors", "strength_model": 0.7 }
+  },
+  "4": {
+    "class_type": "ModelSamplingSD3",
+    "inputs": { "model": ["3", 0], "shift": 5.0 }
+  },
+  "5": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": { "model": ["2", 0], "lora_name": "wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors", "strength_model": 1.0 }
+  },
+  "6": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": { "model": ["5", 0], "lora_name": "instareal_wan22_low.safetensors", "strength_model": 0.8 }
+  },
+  "7": {
+    "class_type": "ModelSamplingSD3",
+    "inputs": { "model": ["6", 0], "shift": 5.0 }
+  },
+  "8": {
+    "class_type": "CLIPLoader",
+    "inputs": { "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors", "type": "wan", "device": "default" }
+  },
+  "9": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "__PROMPT__", "clip": ["8", 0] }
+  },
+  "10": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走, oversaturated, overexposed, smooth plastic skin, airbrushed, beauty filter, 3D render, CGI, video game look, slow motion, watermark, subtitles", "clip": ["8", 0] }
+  },
+  "11": {
+    "class_type": "VAELoader",
+    "inputs": { "vae_name": "wan_2.1_vae.safetensors" }
+  },
+  "12": {
+    "class_type": "EmptyHunyuanLatentVideo",
+    "inputs": { "width": "__WIDTH__", "height": "__HEIGHT__", "length": "__NUM_FRAMES__", "batch_size": 1 }
+  },
+  "13": {
+    "class_type": "KSamplerAdvanced",
+    "inputs": {
+      "add_noise": "enable", "noise_seed": "__SEED__", "steps": 8, "cfg": 3.0,
+      "sampler_name": "euler", "scheduler": "simple",
+      "start_at_step": 0, "end_at_step": 4, "return_with_leftover_noise": "enable",
+      "model": ["4", 0], "positive": ["9", 0], "negative": ["10", 0], "latent_image": ["12", 0]
+    }
+  },
+  "14": {
+    "class_type": "KSamplerAdvanced",
+    "inputs": {
+      "add_noise": "disable", "noise_seed": 0, "steps": 8, "cfg": 1.0,
+      "sampler_name": "euler", "scheduler": "simple",
+      "start_at_step": 4, "end_at_step": 10000, "return_with_leftover_noise": "disable",
+      "model": ["7", 0], "positive": ["9", 0], "negative": ["10", 0], "latent_image": ["13", 0]
+    }
+  },
+  "15": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["14", 0], "vae": ["11", 0] }
+  },
+  "16": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": ["15", 0], "frame_rate": "__FPS__", "loop_count": 0,
+      "filename_prefix": "wan_output", "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p", "crf": 17, "save_metadata": false, "pingpong": false,
+      "save_output": true
+    }
+  }
 }
