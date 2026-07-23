@@ -46,9 +46,11 @@ export interface ModeConfig {
   bootstrapMode: QualityMode;
   /** Which workflow the control plane serves for /worker/workflow.json?mode=… */
   workflowFile: 'workflow.json' | 'workflow-max.json';
-  /** R2 key of the model checkpoint bootstrap downloads for this mode. */
-  checkpointR2Key: string;
 }
+// NOTE: the checkpoint each mode downloads is derived from MODE inside
+// bootstrap-models.sh (a served shell script cannot read this record). Do not
+// re-add a checkpoint field here — two sources of truth that merely agree today
+// will silently diverge on the next rename.
 
 // Built from ./Dockerfile by .github/workflows/build-worker-image.yml.
 // Bakes torch cu128 + ComfyUI + LTX nodes, so bootstrap only fetches weights.
@@ -64,7 +66,6 @@ export const MODES: Record<QualityMode, ModeConfig> = {
     workerImage: GHCR_WORKER_IMAGE,
     bootstrapMode: 'flex',
     workflowFile: 'workflow.json',
-    checkpointR2Key: 'checkpoints/ltx-2.3-22b-distilled-1.1.safetensors',
   },
   max: {
     // RTX PRO 6000 comes as a workstation ('WS') and a server ('S') SKU —
@@ -77,7 +78,6 @@ export const MODES: Record<QualityMode, ModeConfig> = {
     workerImage: GHCR_WORKER_IMAGE,
     bootstrapMode: 'max',
     workflowFile: 'workflow-max.json',
-    checkpointR2Key: 'checkpoints/ltx-2.3-22b-dev.safetensors',
   },
 };
 

@@ -284,7 +284,30 @@ def submit_workflow(workflow: dict) -> str:
         return result["prompt_id"]
 
 
-def wait_for_completion(prompt_id: str, timeout_sec: int = 600) -> dict:
+# Render-time budget per mode. Flex: 8 steps, CFG 1 → minutes. Max: 24 steps at
+# CFG 3.5 is ~6× the model evals (cond+uncond per step), so a 10 s clip can pass
+# 10 real minutes on an RTX PRO 6000 — a flat 600 s would time out every long max
+# render and (worse) leave it running: see the interrupt logic below.
+RENDER_TIMEOUT_SEC = 2400 if MODE == "max" else 600
+
+
+def interrupt_render() -> None:
+    """Best-effort: stop the in-flight ComfyUI render and drop queued prompts.
+
+    Without this, a timed-out prompt keeps rendering; the next claimed job queues
+    BEHIND it and also times out, cascading until every job in the stream has
+    burned its attempts while the GPU grinds on one zombie render.
+    """
+    for path, payload in (("/interrupt", b"{}"), ("/queue", b'{"clear": true}')):
+        try:
+            req = urllib.request.Request(f"{COMFY_URL}{path}", data=payload,
+                                         headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=10).read()
+        except Exception as e:
+            log(f"interrupt_render {path} failed (non-fatal): {e}")
+
+
+def wait_for_completion(prompt_id: str, timeout_sec: int = RENDER_TIMEOUT_SEC) -> dict:
     """Poll ComfyUI history until the prompt completes. Returns output info."""
     deadline = time.time() + timeout_sec
     while time.time() < deadline:
@@ -302,6 +325,9 @@ def wait_for_completion(prompt_id: str, timeout_sec: int = 600) -> dict:
 
         time.sleep(3)
 
+    # Kill the zombie render BEFORE surfacing the timeout, so the next job starts
+    # on an idle GPU instead of queueing behind this one.
+    interrupt_render()
     raise TimeoutError(f"ComfyUI render timed out after {timeout_sec}s")
 
 

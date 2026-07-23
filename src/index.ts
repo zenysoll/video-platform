@@ -211,8 +211,16 @@ export default {
       const log = (msg: string) => { logs.push(msg); logger.info(msg); };
 
       const stream = await env.DB
-        .prepare('SELECT id, state, total_videos, duration_secs, gpu_count FROM streams WHERE id = ?')
-        .bind(streamId).first<{ id: string; state: string; total_videos: number; duration_secs: number; gpu_count: number }>();
+        .prepare('SELECT id, state, total_videos, duration_secs, gpu_count, quality_mode FROM streams WHERE id = ?')
+        .bind(streamId).first<{ id: string; state: string; total_videos: number; duration_secs: number; gpu_count: number; quality_mode: string | null }>();
+
+      // This route predates quality modes and hardcodes the flex profile (5090,
+      // flex workflow, no MODE export). Running it for a max stream would silently
+      // cross modes: max prompts rendered by the flex pipeline on flex hardware.
+      // Refuse rather than half-support it — the normal queue path handles max.
+      if (stream && stream.quality_mode === 'max') {
+        return Response.json({ error: 'debug provision does not support max streams — use /debug/re-enqueue' }, { status: 400 });
+      }
       if (!stream) return Response.json({ error: 'stream not found', logs }, { status: 404 });
 
       log(`Stream: ${stream.id}, state=${stream.state}, gpu_count=${stream.gpu_count}`);

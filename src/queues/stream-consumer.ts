@@ -132,7 +132,7 @@ async function processStreamBatch(msg: StreamLaunchMessage, env: Env): Promise<v
   // Generate prompts.
   const geminiConfig = {
     apiKey: env.GEMINI_API_KEY,
-    model: env.GEMINI_MODEL ?? 'gemini-2.0-flash',
+    model: env.GEMINI_MODEL ?? 'gemini-2.5-flash',  // must be a thinking-capable model: planner-max sends thinkingConfig
   };
 
   const priorAvoidLabels = await buildPriorAvoidLabelsForStream(
@@ -509,9 +509,15 @@ export async function findOffers(
   // An unverified host that CDI-fails is now cheap: bootstrap fast-fails →
   // provision-failed destroys it immediately (Fix), and the reaper orphan sweep is the
   // final backstop.
+  // Try EVERY mode tier, not just the preferred SKU: max's pool is small
+  // (WS + S variants of the RTX PRO 6000), and an emergency tier that only
+  // knows one SKU can deadlock while the other has supply.
   if (offers.length === 0) {
     logger.warn('no verified offers at all — last-resort unverified preferred-GPU search', { stream_id: streamId, mode, gpu_count: gpuCount });
-    offers = withinBudget(await vast.searchOffers({ ...baseQuery, verified: false, gpu_name: gpuPreferred }));
+    for (const gpuName of cfg.gpuTiers) {
+      offers = withinBudget(await vast.searchOffers({ ...baseQuery, verified: false, gpu_name: gpuName }));
+      if (offers.length > 0) break;
+    }
   }
 
   // Tier 4 (safety valve): drop the *dynamic* host cooldown, keeping the permanent
@@ -522,12 +528,15 @@ export async function findOffers(
     logger.warn('all hosts benched — retrying without the failure cooldown', {
       stream_id: streamId, benched: excludedHosts.length,
     });
-    offers = withinBudget(await vast.searchOffers({
-      ...baseQuery,
-      excluded_host_ids: parseIdList(env.VAST_EXCLUDED_HOSTS),
-      excluded_host_ips: [],
-      gpu_name: gpuPreferred,
-    }));
+    for (const gpuName of cfg.gpuTiers) {
+      offers = withinBudget(await vast.searchOffers({
+        ...baseQuery,
+        excluded_host_ids: parseIdList(env.VAST_EXCLUDED_HOSTS),
+        excluded_host_ips: [],
+        gpu_name: gpuName,
+      }));
+      if (offers.length > 0) break;
+    }
   }
 
   return offers;

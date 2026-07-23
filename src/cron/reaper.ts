@@ -704,14 +704,28 @@ async function sweepStalledBatchChains(env: Env): Promise<number> {
  *     progress → destroy + reset to NULL so sweep 3 re-provisions on a fresh host.
  *     The live instance-age check protects a still-booting replacement.
  */
+/**
+ * Per-mode "no render progress yet" recycle window, minutes.
+ *
+ * Flex: ghcr image pull ~4.5 min + 55 GB weights ~16 min → first render ~22 min;
+ * 40 gives ~2× headroom. Max: the 42 GB dev checkpoint may fall back to
+ * HuggingFace until R2 is seeded, and a max render itself runs many minutes —
+ * with a 40-min window the reaper would destroy a legitimately-downloading first
+ * boot AND false-bench a healthy host from the small RTX PRO 6000 pool, looping
+ * until the 24 h give-up. 90 covers HF-fallback boot + first long render.
+ */
+function stallRecycleMin(mode: string | null): number {
+  return mode === 'max' ? 90 : STALL_RECYCLE_MIN;
+}
+
 async function sweepStalledStreams(env: Env): Promise<number> {
   const now = Date.now();
-  const recycleCutoff = new Date(now - STALL_RECYCLE_MIN * 60_000).toISOString();
   const hardCutoff = new Date(now - STREAM_HARD_LIMIT_HOURS * 3_600_000).toISOString();
 
   const candidates = await env.DB
     .prepare(`
       SELECT s.id, s.user_id, s.vast_instance_id, s.vast_host_id, s.vast_host_ip, s.started_at,
+             s.quality_mode,
              s.total_videos, s.videos_rendered,
              (SELECT MAX(j2.render_completed_at) FROM jobs j2 WHERE j2.stream_id = s.id) AS last_render,
              (SELECT MAX(j3.render_started_at)   FROM jobs j3 WHERE j3.stream_id = s.id) AS last_start
@@ -722,7 +736,7 @@ async function sweepStalledStreams(env: Env): Promise<number> {
     .all<{
       id: string; user_id: number; vast_instance_id: string | null; vast_host_id: number | null;
       vast_host_ip: string | null;
-      started_at: string | null;
+      started_at: string | null; quality_mode: string | null;
       total_videos: number; videos_rendered: number;
       last_render: string | null; last_start: string | null;
     }>();
@@ -739,6 +753,8 @@ async function sweepStalledStreams(env: Env): Promise<number> {
     const hasInstance = !isNaN(instanceId);
 
     // Most recent render activity (claim or completion). null → never rendered.
+    const recycleMin = stallRecycleMin(s.quality_mode);
+    const recycleCutoff = new Date(now - recycleMin * 60_000).toISOString();
     const lastActivity = [s.last_render, s.last_start].filter(Boolean).sort().at(-1) ?? null;
     const noRecentProgress = !lastActivity || lastActivity < recycleCutoff;
 
@@ -790,7 +806,7 @@ async function sweepStalledStreams(env: Env): Promise<number> {
     const loadingStuckMin = minutesFromEnv(env.REAPER_LOADING_STUCK_MIN, LOADING_STUCK_MIN);
     const stuckLoading = (actualStatus === 'loading' || actualStatus === 'created')
       && instanceAgeMin >= loadingStuckMin;
-    const aliveButDead = actualStatus === 'running' && instanceAgeMin >= STALL_RECYCLE_MIN;
+    const aliveButDead = actualStatus === 'running' && instanceAgeMin >= recycleMin;
     if (!stuckLoading && !aliveButDead) continue; // still booting / progressing — protect
 
     const reason = stuckLoading ? 'stuck-loading' : 'alive-but-dead';

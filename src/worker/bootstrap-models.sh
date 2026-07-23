@@ -211,7 +211,13 @@ GPU_COUNT="${GPU_COUNT:-1}"
 LOG "GPU_COUNT=${GPU_COUNT}"
 
 # ── Start ComfyUI instances (one per GPU) ──────────────────────────────────────
-LOG "Starting ${GPU_COUNT}× ComfyUI (--lowvram for 46 GB model on 32 GB GPU)..."
+# --lowvram is for flex only: 46 GB model on a 32 GB RTX 5090 needs layer
+# streaming. Max runs a 42 GB model on a 96 GB RTX PRO 6000 — forcing LOW_VRAM
+# there would stream layers needlessly and multiply render time at the highest
+# $/hr in the fleet.
+VRAM_FLAG="--lowvram"
+[ "${MODE:-flex}" = "max" ] && VRAM_FLAG=""
+LOG "Starting ${GPU_COUNT}× ComfyUI (mode=${MODE:-flex}, vram flag='${VRAM_FLAG}')..."
 cd "$COMFY_DIR"
 
 for i in $(seq 0 $((GPU_COUNT - 1))); do
@@ -219,7 +225,7 @@ for i in $(seq 0 $((GPU_COUNT - 1))); do
   LOG "Starting ComfyUI #${i} on port ${PORT} (CUDA_VISIBLE_DEVICES=${i})..."
   CUDA_VISIBLE_DEVICES=$i python main.py \
     --listen 127.0.0.1 --port $PORT \
-    --disable-auto-launch --lowvram \
+    --disable-auto-launch $VRAM_FLAG \
     > /tmp/comfy_${i}.log 2>&1 &
   echo $! > /tmp/comfy_${i}.pid
 done

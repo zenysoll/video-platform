@@ -36,11 +36,11 @@ export async function startWizardFlow(
   await saveSession(env.DB, userId, 'wizard_quality', {});
   await telegramCall('sendMessage', {
     chat_id: chatId,
-    text: `Quality:\n\n⚡ Flex — RTX 5090, distilled model, cheapest per video\n💎 Max — RTX PRO 6000 96GB, dev model, showcase quality (~5× cost)`,
+    text: `Quality:\n\n⚡ Flex — fast and cheap, the current production look\n💎 Max — showcase quality at ~5× the cost per video`,
     reply_markup: {
       inline_keyboard: [
-        [{ text: '⚡ Flex — быстро и дёшево', callback_data: 'qm:flex' }],
-        [{ text: '💎 Max — максимальное качество', callback_data: 'qm:max' }],
+        [{ text: '⚡ Flex — fast & cheap', callback_data: 'qm:flex' }],
+        [{ text: '💎 Max — showcase quality', callback_data: 'qm:max' }],
         [cancelButton()],
       ],
     },
@@ -271,7 +271,7 @@ async function handleAspectRatioChoice(
   }
 
   data.aspect_ratio = ar;
-  const [w, h] = arToPixels(ar);
+  const [w, h] = arToPixels(ar, data.quality_mode === 'max' ? 'max' : 'flex');
   data.width = w;
   data.height = h;
   await saveSession(env.DB, userId, 'wizard_fps', data);
@@ -663,7 +663,18 @@ async function editMessage(
   }
 }
 
-function arToPixels(ar: string): [number, number] {
+// Max renders 1080p-class: the entire cost case for the mode is "pay ~5× for
+// showcase quality", and 24 steps at flex resolution would waste that premium.
+// Dimensions stay multiples of 32 (LTX latent constraint) — hence 1088, not 1080.
+function arToPixels(ar: string, mode: 'flex' | 'max' = 'flex'): [number, number] {
+  if (mode === 'max') {
+    switch (ar) {
+      case '9:16':  return [1088, 1920];
+      case '16:9':  return [1920, 1088];
+      case '1:1':   return [1440, 1440];
+      default:      return [1440, 1440];
+    }
+  }
   switch (ar) {
     case '9:16':  return [576, 1024];
     case '16:9':  return [1024, 576];
