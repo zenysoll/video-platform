@@ -1,8 +1,12 @@
 /**
  * R2 key naming — flat layout, self-describing filename.
  *
- * Format: <job_id>_<WxH>_<fps>_<durationSecs>_<timestampUtc>.mp4
- * Example: 7f3a9c21-4b2e-4f8d-a1c3-9e0d7f2b5a6c_576x1024_24_5_20260419T183345Z.mp4
+ * Format: <job_id>_<WxH>_<fps>_<durationSecs>_<timestampUtc>_<mode>.mp4
+ * Example: 7f3a9c21-4b2e-4f8d-a1c3-9e0d7f2b5a6c_576x1024_24_5_20260419T183345Z_flex.mp4
+ *
+ * The trailing _flex / _max tags the quality tier directly in the filename so
+ * flex and max deliverables are separable in any bucket without querying D1
+ * (operators sort/route their R2 by this suffix).
  *
  * All videos land at the bucket root — no folder hierarchy.
  * Every identity dimension (job, resolution, fps, duration, time) is readable
@@ -17,6 +21,8 @@ export interface R2KeyParams {
   height: number;
   fps: number;
   durationSecs: number;
+  /** Quality tier — appended as the trailing filename tag. */
+  mode: 'flex' | 'max';
   /** Upload timestamp. Defaults to Date.now() when omitted. */
   uploadedAt?: Date;
 }
@@ -36,5 +42,5 @@ function toBasicUtc(d: Date): string {
 export function buildR2Key(params: R2KeyParams): string {
   const ts = toBasicUtc(params.uploadedAt ?? new Date());
   const res = `${params.width}x${params.height}`;
-  return `${params.jobId}_${res}_${params.fps}_${params.durationSecs}_${ts}.mp4`;
+  return `${params.jobId}_${res}_${params.fps}_${params.durationSecs}_${ts}_${params.mode}.mp4`;
 }

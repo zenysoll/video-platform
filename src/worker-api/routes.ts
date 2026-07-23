@@ -153,7 +153,7 @@ async function handleVideoUpload(
   const row = await env.DB
     .prepare(`
       SELECT j.id, j.stream_id,
-             s.width, s.height, s.fps, s.duration_secs, s.bucket_id
+             s.width, s.height, s.fps, s.duration_secs, s.bucket_id, s.quality_mode
       FROM jobs j
       JOIN streams s ON s.id = j.stream_id
       WHERE j.id = ?
@@ -163,7 +163,7 @@ async function handleVideoUpload(
       id: string; stream_id: string;
       width: number | null; height: number | null;
       fps: number; duration_secs: number;
-      bucket_id: string | null;
+      bucket_id: string | null; quality_mode: string | null;
     }>();
 
   if (!row) return Response.json({ error: 'job not found' }, { status: 404 });
@@ -175,6 +175,8 @@ async function handleVideoUpload(
     height: row.height ?? 512,
     fps: row.fps,
     durationSecs: row.duration_secs,
+    // 'max2' is the legacy value of the Wan tier — tag it _max like any other.
+    mode: (row.quality_mode === 'max' || row.quality_mode === 'max2') ? 'max' : 'flex',
   });
 
   const contentType = request.headers.get('Content-Type') ?? 'video/mp4';

@@ -76,8 +76,7 @@ VAST_EXCLUDED_MACHINES = "36773,79532,53128,58852,40274,105191,94979,106241"   #
 VAST_EXCLUDED_HOSTS = "402342"
 # Image pull on slower hosts can exceed 10 min; 20 keeps a margin above the
 # observed 4.5-14 min ghcr pull range so the reaper never recycles a live pull.
-REAPER_LOADING_STUCK_MIN = "20"
-REAPER_PAUSED = "1"   # TEMP: calibration session on live instance — REMOVE after
+REAPER_LOADING_STUCK_MIN = "20"   # Wan image+model pulls can exceed the 10-min default
 
 # ── Secrets (set via `wrangler secret put <NAME>`) ───────────────────────────
 # Never add values here. These names are listed for documentation only:
