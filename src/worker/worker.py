@@ -388,8 +388,15 @@ def film_finish(video_path: str) -> str:
         # frame purple (shipped exactly that to a live test stream). In rgb24
         # every channel is independent: keep red, cut green/blue, blur, screen.
         "format=rgb24,split[b][h];"
-        "[h]lutrgb=r='if(gt(val,200),val,0)':g='if(gt(val,200),val*0.35,0)':b='if(gt(val,200),val*0.15,0)',gblur=sigma=24[hb];"
-        "[b][hb]blend=all_mode=screen:all_opacity=0.25,"
+        # Halation lessons from two live batches, both verified by pixel probes:
+        # threshold 235 (200 caught entire bright skies and tinted them), and
+        # ADDITIVE blend of a pre-attenuated (×0.35) layer instead of screen with
+        # all_opacity — blend's opacity path shifted even untouched neutral grays
+        # (80,80,80)→(95,69,99). Addition of a black layer is exact identity, so
+        # the finish provably cannot recolor regions the halo doesn't reach.
+        "[h]lutrgb=r='if(gt(val,235),val,0)':g='if(gt(val,235),val*0.35,0)':b='if(gt(val,235),val*0.15,0)',gblur=sigma=16,"
+        "lutrgb=r='val*0.35':g='val*0.35':b='val*0.35'[hb];"
+        "[b][hb]blend=all_mode=addition,"
         "format=yuv420p,"
         "crop=iw-8:ih-8:4+3*sin(t*1.25):4+3*sin(t*1.625)"
     )
