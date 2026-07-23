@@ -14,8 +14,8 @@ import { logger } from '../../lib/logger.js';
 
 /** 💎 (max) / 🎬 (max2) prefix marks quality streams wherever a stream name is rendered. */
 function modeBadge(s: { quality_mode?: string }): string {
-  if (s.quality_mode === 'max') return '💎 ';
-  if (s.quality_mode === 'max2') return '🎬 ';
+  // 'max2' rows predate the tier collapse (max = Wan since 2026-07-23) — same badge.
+  if (s.quality_mode === 'max' || s.quality_mode === 'max2') return '💎 ';
   return '';
 }
 

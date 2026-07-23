@@ -40,8 +40,8 @@ export interface PromptBatchMeta {
   /** Raw env string; parsed with parseDiversityMode. */
   diversityMode: string;
   /**
-   * Stream quality mode — 'max' and 'max2' switch to the structured cinematic
-   * planner (planner-max.ts; max2 additionally gets its LoRA trigger prefix).
+   * Stream quality mode — 'max' switches to the structured cinematic planner
+   * (planner-max.ts), which also prepends the Wan LoRA trigger prefix.
    * Fingerprinting, dedup and rerolls are identical in all modes; only the
    * brief generator and the length window differ.
    */
@@ -99,10 +99,10 @@ export async function generatePromptBatch(
 
   const diversityMode = batchMeta ? parseDiversityMode(batchMeta.diversityMode) : parseDiversityMode('off');
   const qualityMode: QualityMode = batchMeta?.qualityMode ?? 'flex';
-  // max2 rides the whole max planner path (structured brief, server-rendered
+  // max rides the structured-brief planner path (server-rendered
   // paragraph, max length window) — it differs only by the LoRA trigger prefix
   // that generateMaxBrief applies when passed the mode.
-  const usesMaxPlanner = qualityMode === 'max' || qualityMode === 'max2';
+  const usesMaxPlanner = qualityMode === 'max';
 
   for (let i = 0; i < count; i++) {
     if (serviceOutage) break;

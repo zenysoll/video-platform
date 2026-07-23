@@ -22,7 +22,6 @@ import bootstrapSh from './worker/bootstrap.sh';
 import bootstrapModelsSh from './worker/bootstrap-models.sh';
 import workerPy from './worker/worker.py';
 import workflowJson from './worker/workflow.json';
-import workflowMaxJson from './worker/workflow-max.json';
 import workflowWanJson from './worker/workflow-wan.json';
 import { parseQualityMode } from './config/modes.js';
 
@@ -66,14 +65,11 @@ export default {
       });
     }
     if (path === '/worker/workflow.json') {
-      // ?mode=max serves the dev-checkpoint workflow (24 steps, CFG 3.5, real
-      // negative prompt); ?mode=max2 serves the Wan 2.2 dual-expert graph.
-      // Unknown/absent mode falls back to flex so old workers that fetch
-      // without the query keep working.
+      // ?mode=max (and the legacy ?mode=max2 an already-running instance sends)
+      // serves the Wan 2.2 dual-expert graph — parseQualityMode maps the alias.
+      // Unknown/absent mode falls back to flex so old workers keep working.
       const workflowMode = parseQualityMode(url.searchParams.get('mode'));
-      const workflow = workflowMode === 'max' ? workflowMaxJson
-        : workflowMode === 'max2' ? workflowWanJson
-        : workflowJson;
+      const workflow = workflowMode === 'max' ? workflowWanJson : workflowJson;
       return new Response(JSON.stringify(workflow), {
         headers: { 'Content-Type': 'application/json' },
       });

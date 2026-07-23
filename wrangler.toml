@@ -74,6 +74,9 @@ VAST_EXCLUDED_MACHINES = "36773,79532,53128,58852,40274,105191,94979,106241"   #
 # on 2026-07-21 (docker pull stalled behind a shared-IP Docker Hub rate limit) and
 # served machines 73811 / 91334 / 91308 for the same box.
 VAST_EXCLUDED_HOSTS = "402342"
+# Image pull on slower hosts can exceed 10 min; 20 keeps a margin above the
+# observed 4.5-14 min ghcr pull range so the reaper never recycles a live pull.
+REAPER_LOADING_STUCK_MIN = "20"
 
 # ── Secrets (set via `wrangler secret put <NAME>`) ───────────────────────────
 # Never add values here. These names are listed for documentation only:

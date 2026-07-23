@@ -139,7 +139,7 @@ print(f'[bootstrap] $name done in {(time.time()-t0)/60:.1f}min', flush=True)
   LOG "$name ready."
 }
 
-# ── Wan 2.2 model manifest (max2) — ~38 GB total ──────────────────────────────
+# ── Wan 2.2 model manifest (max) — ~38 GB total ───────────────────────────────
 # Fields: local-rel-path (= R2 key) | HF repo | HF file path | min bytes.
 # The lightx2v 4-step v1.1 t2v lora pair comes from the Comfy-Org repackage —
 # same weights as lightx2v/Wan2.2-Lightning's Seko-V1.1 pair, but published
@@ -157,24 +157,20 @@ WAN_MANIFEST=(
   "loras/instareal_wan22_low.safetensors|Instara/instareal-wan-2.2|Instareal_low.safetensors|300000000"
 )
 
-if [ "$MODE" = "max2" ]; then
-  # ── Wan 2.2 dual-expert set — max2 downloads NO LTX and NO Gemma ────────────
+# max2 is the legacy env value a pre-collapse instance may still carry.
+if [ "$MODE" = "max" ] || [ "$MODE" = "max2" ]; then
+  # ── Wan 2.2 dual-expert set — max downloads NO LTX and NO Gemma ─────────────
   for entry in "${WAN_MANIFEST[@]}"; do
     IFS='|' read -r rel repo hf_path min <<< "$entry"
     fetch_model "$rel" "$repo" "$hf_path" "$min"
   done
 else
 
-# ── LTX-2.3 checkpoint — distilled v1.1 (flex, ~46 GB) or dev (max, ~42 GB) ──
-# Min-size gates catch truncated downloads: distilled must exceed 40 GB, the
-# bf16 dev checkpoint 38 GB.
-if [ "$MODE" = "max" ]; then
-  LTX_FILE="ltx-2.3-22b-dev.safetensors"
-  LTX_MIN=38000000000
-else
-  LTX_FILE="ltx-2.3-22b-distilled-1.1.safetensors"
-  LTX_MIN=40000000000
-fi
+# ── LTX-2.3 distilled checkpoint (flex, ~46 GB) ──────────────────────────────
+# The LTX-dev tier is gone (operator verdict 2026-07-23) — flex is the only LTX
+# mode left. Min-size gate catches truncated downloads.
+LTX_FILE="ltx-2.3-22b-distilled-1.1.safetensors"
+LTX_MIN=40000000000
 LTX_CKPT="$MODEL_DIR/checkpoints/$LTX_FILE"
 
 if [ -f "$LTX_CKPT" ] && [ "$(stat -c%s "$LTX_CKPT" 2>/dev/null || echo 0)" -ge $LTX_MIN ]; then
@@ -256,7 +252,7 @@ if r2_available; then
   (
     export AWS_ACCESS_KEY_ID="$R2_MODEL_KEY_ID"
     export AWS_SECRET_ACCESS_KEY="$R2_MODEL_SECRET"
-    if [ "$MODE" = "max2" ]; then
+    if [ "$MODE" = "max" ] || [ "$MODE" = "max2" ]; then
       # Seed exactly what this mode downloaded — one manifest drives both the
       # download and the seed-back, so the two can never drift apart.
       for entry in "${WAN_MANIFEST[@]}"; do

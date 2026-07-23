@@ -57,3 +57,10 @@ config fallback.
 - Quality: side-by-side vs flex output; bar = "operator prefers max in ≥80% pairs".
 - Full existing test suite (run_tests.sh 9/9) must stay green — mode must not break flex.
 - Live: 1 single-video stream → then 3-5 video stream → then merge.
+
+## AMENDMENT 2026-07-23: LTX-dev tier killed, max = Wan 2.2
+Operator verdict on live output: LTX-2.3 dev (even with the two-stage plan ahead)
+was visually indistinguishable from flex at ~3× the GPU price. The LTX-dev tier is
+removed; **'max' is now the Wan 2.2 dual-expert + Instareal pipeline on RTX 5090**
+(formerly 'max2', which survives only as a DB/env legacy alias). Product returns
+to the original two-tier shape: ⚡ Flex / 💎 Max.

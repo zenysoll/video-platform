@@ -186,10 +186,8 @@ def frames_for_duration(fps: int, duration_secs: int) -> int:
 # path below feeds it to LTXVAudioVAELoader, which reads from disk by filename.
 # Only meaningful for the LTX modes (flex/max); max2 never uses it — its sound
 # request is downgraded to silent in build_workflow.
-LTX_CHECKPOINT = (
-    "ltx-2.3-22b-dev.safetensors" if MODE == "max"
-    else "ltx-2.3-22b-distilled-1.1.safetensors"
-)
+# Only flex renders with LTX now — max is the Wan pipeline and never loads this.
+LTX_CHECKPOINT = "ltx-2.3-22b-distilled-1.1.safetensors"
 
 
 def build_workflow(job: dict) -> dict:
@@ -200,7 +198,7 @@ def build_workflow(job: dict) -> dict:
     fps           = int(job.get("fps", 24))
     duration      = int(job.get("duration_secs", 5))
     seed          = random.randint(0, 2**32 - 1)
-    if MODE == "max2":
+    if MODE in ("max", "max2"):  # max2 = legacy env on pre-collapse instances
         # Wan 2.2 is a 16 fps-native model (81 frames = 5 s). Rendering the
         # stream's 24 fps here would both overshoot Wan's trained frame budget
         # and play back 1.5× too fast. Generate at native cadence; film_finish
@@ -211,7 +209,7 @@ def build_workflow(job: dict) -> dict:
     else:
         nframes = frames_for_duration(fps, duration)
     sound_enabled = bool(job.get("sound_enabled", False))
-    if sound_enabled and MODE == "max2":
+    if sound_enabled and MODE in ("max", "max2"):
         # The AV-latent injection below is LTX-specific: it adds LTXVAudio*
         # nodes and references the LTX checkpoint, which a max2 (Wan) instance
         # never downloads. Injecting it into the Wan graph would fail ComfyUI
@@ -378,7 +376,7 @@ def film_finish(video_path: str) -> str:
     # to the product's 24 fps runs FIRST so every later stage (grain, weave)
     # operates on final-cadence frames. Never interpolate past 24: higher-fps
     # smoothness is the soap-opera effect, the opposite of the film feel.
-    pre = "minterpolate=fps=24:mi_mode=mci:mc_mode=aobmc:vsbmc=1," if MODE == "max2" else ""
+    pre = "minterpolate=fps=24:mi_mode=mci:mc_mode=aobmc:vsbmc=1," if MODE in ("max", "max2") else ""
     fc = (
         pre +
         "curves=master='0/0.015 0.25/0.235 0.5/0.5 0.75/0.775 1/0.965',"

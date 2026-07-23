@@ -717,7 +717,7 @@ async function sweepStalledBatchChains(env: Env): Promise<number> {
  * possibly all from HuggingFace until R2 is seeded.
  */
 function stallRecycleMin(mode: string | null): number {
-  return mode === 'max' || mode === 'max2' ? 90 : STALL_RECYCLE_MIN;
+  return mode === 'max' || mode === 'max2' ? 90 : STALL_RECYCLE_MIN;  // max2 = legacy rows
 }
 
 async function sweepStalledStreams(env: Env): Promise<number> {

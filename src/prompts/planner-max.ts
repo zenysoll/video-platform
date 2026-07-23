@@ -20,18 +20,16 @@ import type { QualityMode } from '../config/modes.js';
 /**
  * Per-mode trigger prefix prepended to the rendered paragraph.
  *
- * max2 runs the Wan 2.2 Instareal LoRA, which was trained with the literal
+ * max (the Wan 2.2 pipeline) runs the Instareal LoRA, trained with the literal
  * trigger tokens "Instacam, amateur photo" — the LoRA activates far more
  * reliably from its trigger words than from equivalent natural-language
  * descriptors, and Wan weights the START of the prompt, so the tokens must
- * lead the paragraph. flex/max carry an empty prefix: their rendered output
- * stays byte-identical to the pre-max2 pipeline (stable fingerprints and
- * avoid-snippets across the rollout).
+ * lead the paragraph. flex carries an empty prefix: its rendered output stays
+ * byte-identical (stable fingerprints and avoid-snippets across rollouts).
  */
 export const MODE_TRIGGER_PREFIX: Record<QualityMode, string> = {
   flex: '',
-  max: '',
-  max2: 'Instacam, amateur photo, ',
+  max: 'Instacam, amateur photo, ',
 };
 
 /**
@@ -173,7 +171,7 @@ export async function generateMaxBrief(
   config: GeminiConfig,
   priorAvoidThemes: string[] = [],
   creativeAnchors?: string | null,
-  // 'max2' shares this whole planner; the only difference is the LoRA trigger
+  // The only per-mode difference in this planner is the LoRA trigger
   // prefix applied in renderMaxParagraph. Defaults to 'max' so existing call
   // sites keep byte-identical output.
   mode: QualityMode = 'max',

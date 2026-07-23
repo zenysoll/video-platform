@@ -36,12 +36,11 @@ export async function startWizardFlow(
   await saveSession(env.DB, userId, 'wizard_quality', {});
   await telegramCall('sendMessage', {
     chat_id: chatId,
-    text: `Quality:\n\n⚡ Flex — fast and cheap, the current production look\n💎 Max — showcase quality at ~5× the cost per video\n🎬 Max2 — realism engine (Wan 2.2), flex-priced hardware`,
+    text: `Quality:\n\n⚡ Flex — fast and cheap, the current production look\n💎 Max — realism engine (Wan 2.2), same hardware price, ~2× render time`,
     reply_markup: {
       inline_keyboard: [
         [{ text: '⚡ Flex — fast & cheap', callback_data: 'qm:flex' }],
-        [{ text: '💎 Max — showcase quality', callback_data: 'qm:max' }],
-        [{ text: '🎬 Max2 — realism engine', callback_data: 'qm:max2' }],
+        [{ text: '💎 Max — realism engine', callback_data: 'qm:max' }],
         [cancelButton()],
       ],
     },
@@ -170,7 +169,7 @@ async function handleQualityChoice(
 ): Promise<void> {
   // Only the three button payloads are valid — anything else (stale button,
   // forged callback) restarts the step instead of writing garbage into D1.
-  if (choice !== 'flex' && choice !== 'max' && choice !== 'max2') {
+  if (choice !== 'flex' && choice !== 'max') {
     await telegramCall('sendMessage', {
       chat_id: chatId, text: 'Please use the buttons to choose a quality mode.',
     }, env.CONTROL_BOT_TOKEN);
@@ -272,12 +271,7 @@ async function handleAspectRatioChoice(
   }
 
   data.aspect_ratio = ar;
-  // max2 deliberately falls through to the flex resolutions: Wan 2.2 fp8 runs on
-  // a 32 GB RTX 5090 where the 1080p-class max dimensions would be OOM-prone.
-  const [w, h] = arToPixels(
-    ar,
-    data.quality_mode === 'max' || data.quality_mode === 'max2' ? data.quality_mode : 'flex',
-  );
+  const [w, h] = arToPixels(ar, data.quality_mode === 'max' ? 'max' : 'flex');
   data.width = w;
   data.height = h;
   await saveSession(env.DB, userId, 'wizard_fps', data);
@@ -655,12 +649,8 @@ function cancelButton() {
 }
 
 /** One place for the operator-facing quality labels — wizard step + confirmation. */
-function qualityLabel(mode: 'flex' | 'max' | 'max2'): string {
-  switch (mode) {
-    case 'max':  return '💎 Max';
-    case 'max2': return '🎬 Max2';
-    default:     return '⚡ Flex';
-  }
+function qualityLabel(mode: 'flex' | 'max'): string {
+  return mode === 'max' ? '💎 Max' : '⚡ Flex';
 }
 
 async function editMessage(
@@ -681,19 +671,10 @@ async function editMessage(
 // Max renders 1080p-class: the entire cost case for the mode is "pay ~5× for
 // showcase quality", and 24 steps at flex resolution would waste that premium.
 // Dimensions stay multiples of 32 (LTX latent constraint) — hence 1088, not 1080.
-function arToPixels(ar: string, mode: 'flex' | 'max' | 'max2' = 'flex'): [number, number] {
+function arToPixels(ar: string, mode: 'flex' | 'max' = 'flex'): [number, number] {
+  // Max = Wan 2.2, a 720p-native model: higher resolutions overrun its training
+  // and ~double render time. Multiples of 16 (Wan VAE stride).
   if (mode === 'max') {
-    switch (ar) {
-      case '9:16':  return [1088, 1920];
-      case '16:9':  return [1920, 1088];
-      case '1:1':   return [1440, 1440];
-      default:      return [1440, 1440];
-    }
-  }
-  // Wan 2.2 A14B is 720p-native: pushing it to 1080p-class both overruns its
-  // trained resolution and roughly doubles render time on the 5090. Multiples
-  // of 16 (Wan VAE stride).
-  if (mode === 'max2') {
     switch (ar) {
       case '9:16':  return [704, 1280];
       case '16:9':  return [1280, 704];
