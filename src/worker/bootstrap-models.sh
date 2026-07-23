@@ -89,6 +89,14 @@ r2_cp() {
     --endpoint-url "$R2_ENDPOINT" --no-progress 2>&1
 }
 
+r2_cp_bucket() {
+  # $1 = bucket, $2 = R2 key, $3 = local dest — same creds/endpoint, other bucket.
+  AWS_ACCESS_KEY_ID="$R2_MODEL_KEY_ID" \
+  AWS_SECRET_ACCESS_KEY="$R2_MODEL_SECRET" \
+  aws s3 cp "s3://$1/$2" "$3" \
+    --endpoint-url "$R2_ENDPOINT" --no-progress 2>&1
+}
+
 r2_available() {
   [ -n "${R2_MODEL_KEY_ID:-}" ] && [ -n "${R2_MODEL_SECRET:-}" ]
 }
@@ -113,12 +121,20 @@ fetch_model() {
 
   LOG "Downloading $name..."
   local ok=false
-  if r2_available; then
-    if r2_cp "$rel" "$dest"; then
+  # Measured on live boots (2026-07-23): HF with Xet transfer moved a 42 GB
+  # checkpoint at ~500 MB/s while the APAC R2 bucket managed ~65 MB/s. For the
+  # Wan set (max) HF is therefore the PRIMARY source and R2 the fallback; the
+  # ENAM R2 bucket (US, near our hosts) takes over as primary once populated —
+  # try it first, it is a fast no-op 404 while empty.
+  if [ "$MODE" != "flex" ]; then
+    if r2_available && r2_cp_bucket "video-platform-models-enam" "$rel" "$dest"; then
+      ok=true
+      LOG "$name downloaded from ENAM R2."
+    fi
+  else
+    if r2_available && r2_cp "$rel" "$dest"; then
       ok=true
       LOG "$name downloaded from R2."
-    else
-      LOG "R2 download failed for $name — falling back to HuggingFace..."
     fi
   fi
 
@@ -131,7 +147,13 @@ t0 = time.time()
 path = hf_hub_download('$repo', '$hf_path', local_dir='/tmp/model_dl')
 shutil.move(path, '$dest')
 print(f'[bootstrap] $name done in {(time.time()-t0)/60:.1f}min', flush=True)
-"
+" || true
+  fi
+
+  # Last resort for max files: the APAC bucket (slow but ours) — only if HF failed.
+  if [ "$MODE" != "flex" ] && [ "$(stat -c%s "$dest" 2>/dev/null || echo 0)" -lt "$min" ] && r2_available; then
+    LOG "HF failed for $name — trying APAC R2 as last resort..."
+    r2_cp "$rel" "$dest" || true
   fi
 
   [ "$(stat -c%s "$dest" 2>/dev/null || echo 0)" -ge "$min" ] || \
@@ -253,17 +275,22 @@ if r2_available; then
     export AWS_ACCESS_KEY_ID="$R2_MODEL_KEY_ID"
     export AWS_SECRET_ACCESS_KEY="$R2_MODEL_SECRET"
     if [ "$MODE" = "max" ] || [ "$MODE" = "max2" ]; then
-      # Seed exactly what this mode downloaded — one manifest drives both the
-      # download and the seed-back, so the two can never drift apart.
+      # Seed the ENAM bucket (US, near our hosts), NOT the APAC one: measured
+      # 65 MB/s from APAC vs ~500 MB/s from HF — an APAC copy would only create
+      # a slow path the R2-first ordering then prefers. ENAM is the bucket the
+      # max fetch path tries first. If the instance's R2 token turns out to be
+      # scoped to the old bucket, every upload logs FAILED (non-fatal) and the
+      # operator needs a one-time account-scoped token instead.
+      ENAM_BUCKET="video-platform-models-enam"
       for entry in "${WAN_MANIFEST[@]}"; do
         IFS='|' read -r rel repo hf_path min <<< "$entry"
-        WAN_R2_SIZE=$(aws s3 ls "s3://${R2_BUCKET}/$rel" \
+        WAN_R2_SIZE=$(aws s3 ls "s3://${ENAM_BUCKET}/$rel" \
           --endpoint-url "$R2_ENDPOINT" 2>/dev/null | awk '{print $3}' || echo 0)
         if [ "${WAN_R2_SIZE:-0}" -lt "$min" ]; then
-          LOG "R2 upload: seeding $rel..."
-          aws s3 cp "$MODEL_DIR/$rel" "s3://${R2_BUCKET}/$rel" \
+          LOG "R2 upload: seeding $rel to ENAM..."
+          aws s3 cp "$MODEL_DIR/$rel" "s3://${ENAM_BUCKET}/$rel" \
             --endpoint-url "$R2_ENDPOINT" --no-progress \
-            && LOG "R2 upload: $rel done." || LOG "R2 upload: $rel FAILED (non-fatal)"
+            && LOG "R2 upload: $rel done (ENAM)." || LOG "R2 upload: $rel FAILED (non-fatal)"
         fi
       done
     else
