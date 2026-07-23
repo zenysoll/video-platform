@@ -5,7 +5,9 @@
 # PyTorch, ComfyUI, and all Python deps are already installed.
 #
 # This script only:
-#   1. Downloads LTX-2.3 checkpoint + Gemma FP4 from R2 (or HF fallback)
+#   1. Downloads the per-mode model set from R2 (or HF fallback):
+#      flex/max — LTX-2.3 checkpoint + Gemma FP4
+#      max2     — Wan 2.2 dual-expert set (2× 14B fp8 + UMT5 + VAE + loras)
 #   2. Downloads worker.py + workflow.json from control plane
 #   3. Starts ComfyUI + worker
 #   4. Sends done signal when finished
@@ -14,7 +16,8 @@
 #
 # Environment variables injected by the control plane:
 #   CONTROL_PLANE_URL, STREAM_ID, WORKER_SECRET, TOTAL_VIDEOS
-#   MODE — 'flex' (distilled ckpt) or 'max' (22B dev ckpt + workflow-max);
+#   MODE — 'flex' (distilled ckpt), 'max' (22B dev ckpt + workflow-max), or
+#          'max2' (Wan 2.2 set + workflow-wan);
 #          defaults to flex so instances started by an older control plane boot fine
 #   R2_MODEL_KEY_ID, R2_MODEL_SECRET — Cloudflare R2 credentials
 #   HF_TOKEN — HuggingFace token (fallback if R2 empty)
@@ -35,7 +38,8 @@ MODEL_DIR="$COMFY_DIR/models"
 R2_BUCKET="video-platform-models"
 R2_ENDPOINT="https://95db7e4a7e28c95dfabfc52650591059.r2.cloudflarestorage.com"
 
-mkdir -p "$MODEL_DIR/checkpoints" "$MODEL_DIR/text_encoders"
+mkdir -p "$MODEL_DIR/checkpoints" "$MODEL_DIR/text_encoders" \
+         "$MODEL_DIR/diffusion_models" "$MODEL_DIR/vae" "$MODEL_DIR/loras"
 
 # Instance id for the provision-failed signal. $CONTAINER_ID is what Vast actually
 # sets at runtime; /etc/vast_instance_id does not exist (that assumption is what let
@@ -88,6 +92,78 @@ r2_cp() {
 r2_available() {
   [ -n "${R2_MODEL_KEY_ID:-}" ] && [ -n "${R2_MODEL_SECRET:-}" ]
 }
+
+# ── Generic model fetch: R2 first, HF fallback, min-size gate ─────────────────
+# Same download discipline as the hand-rolled LTX/Gemma paths below, factored
+# out because max2 needs it for seven files. The R2 key always mirrors the
+# local path under models/ — one naming scheme, replayable from either source.
+#   $1 = path relative to $MODEL_DIR (doubles as the R2 key)
+#   $2 = HF repo id            $3 = file path inside the HF repo
+#   $4 = minimum byte size (truncation gate)
+fetch_model() {
+  local rel="$1" repo="$2" hf_path="$3" min="$4"
+  local dest="$MODEL_DIR/$rel"
+  local name
+  name="$(basename "$rel")"
+
+  if [ -f "$dest" ] && [ "$(stat -c%s "$dest" 2>/dev/null || echo 0)" -ge "$min" ]; then
+    LOG "$name already present."
+    return 0
+  fi
+
+  LOG "Downloading $name..."
+  local ok=false
+  if r2_available; then
+    if r2_cp "$rel" "$dest"; then
+      ok=true
+      LOG "$name downloaded from R2."
+    else
+      LOG "R2 download failed for $name — falling back to HuggingFace..."
+    fi
+  fi
+
+  if [ "$ok" = false ]; then
+    python3 -c "
+import os, time, shutil
+os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
+from huggingface_hub import hf_hub_download
+t0 = time.time()
+path = hf_hub_download('$repo', '$hf_path', local_dir='/tmp/model_dl')
+shutil.move(path, '$dest')
+print(f'[bootstrap] $name done in {(time.time()-t0)/60:.1f}min', flush=True)
+"
+  fi
+
+  [ "$(stat -c%s "$dest" 2>/dev/null || echo 0)" -ge "$min" ] || \
+    { LOG "ERROR: $name download incomplete"; exit 1; }
+  LOG "$name ready."
+}
+
+# ── Wan 2.2 model manifest (max2) — ~38 GB total ──────────────────────────────
+# Fields: local-rel-path (= R2 key) | HF repo | HF file path | min bytes.
+# The lightx2v 4-step v1.1 t2v lora pair comes from the Comfy-Org repackage —
+# same weights as lightx2v/Wan2.2-Lightning's Seko-V1.1 pair, but published
+# under stable descriptive filenames (the upstream repo only has per-version
+# folders of generically named high/low_noise_model.safetensors).
+# instareal_wan22_low.safetensors is Instara's Instareal_low.safetensors,
+# renamed locally to a self-describing name the workflow references.
+WAN_MANIFEST=(
+  "diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors|Comfy-Org/Wan_2.2_ComfyUI_Repackaged|split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors|13000000000"
+  "diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors|Comfy-Org/Wan_2.2_ComfyUI_Repackaged|split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors|13000000000"
+  "text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors|Comfy-Org/Wan_2.2_ComfyUI_Repackaged|split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors|6000000000"
+  "vae/wan_2.1_vae.safetensors|Comfy-Org/Wan_2.2_ComfyUI_Repackaged|split_files/vae/wan_2.1_vae.safetensors|200000000"
+  "loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors|Comfy-Org/Wan_2.2_ComfyUI_Repackaged|split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors|300000000"
+  "loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors|Comfy-Org/Wan_2.2_ComfyUI_Repackaged|split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors|300000000"
+  "loras/instareal_wan22_low.safetensors|Instara/instareal-wan-2.2|Instareal_low.safetensors|300000000"
+)
+
+if [ "$MODE" = "max2" ]; then
+  # ── Wan 2.2 dual-expert set — max2 downloads NO LTX and NO Gemma ────────────
+  for entry in "${WAN_MANIFEST[@]}"; do
+    IFS='|' read -r rel repo hf_path min <<< "$entry"
+    fetch_model "$rel" "$repo" "$hf_path" "$min"
+  done
+else
 
 # ── LTX-2.3 checkpoint — distilled v1.1 (flex, ~46 GB) or dev (max, ~42 GB) ──
 # Min-size gates catch truncated downloads: distilled must exceed 40 GB, the
@@ -171,6 +247,8 @@ print(f'[bootstrap] Gemma done in {(time.time()-t0)/60:.1f}min', flush=True)
   LOG "Gemma FP4 ready."
 fi
 
+fi  # end per-mode model set (max2 = Wan, flex/max = LTX + Gemma)
+
 LOG "Model download complete. Disk: $(df -h / | awk 'NR==2{print $3" used, "$4" free"}')"
 
 # ── Seed R2 with models in background (only if downloaded from HF) ────────────
@@ -178,30 +256,47 @@ if r2_available; then
   (
     export AWS_ACCESS_KEY_ID="$R2_MODEL_KEY_ID"
     export AWS_SECRET_ACCESS_KEY="$R2_MODEL_SECRET"
-    # Only upload if not already in R2 (check size)
-    LTX_R2_SIZE=$(aws s3 ls "s3://${R2_BUCKET}/checkpoints/$LTX_FILE" \
-      --endpoint-url "$R2_ENDPOINT" 2>/dev/null | awk '{print $3}' || echo 0)
-    if [ "${LTX_R2_SIZE:-0}" -lt $LTX_MIN ]; then
-      LOG "R2 upload: seeding LTX-2.3 checkpoint ($LTX_FILE)..."
-      aws s3 cp "$LTX_CKPT" "s3://${R2_BUCKET}/checkpoints/$LTX_FILE" \
-        --endpoint-url "$R2_ENDPOINT" --no-progress \
-        && LOG "R2 upload: LTX-2.3 done." || LOG "R2 upload: LTX-2.3 FAILED (non-fatal)"
-    fi
-    GEMMA_R2_SIZE=$(aws s3 ls "s3://${R2_BUCKET}/text_encoders/comfy_gemma_3_12B_it.safetensors" \
-      --endpoint-url "$R2_ENDPOINT" 2>/dev/null | awk '{print $3}' || echo 0)
-    if [ "${GEMMA_R2_SIZE:-0}" -lt 8000000000 ]; then
-      LOG "R2 upload: seeding Gemma FP4..."
-      aws s3 cp "$GEMMA" "s3://${R2_BUCKET}/text_encoders/comfy_gemma_3_12B_it.safetensors" \
-        --endpoint-url "$R2_ENDPOINT" --no-progress \
-        && LOG "R2 upload: Gemma done." || LOG "R2 upload: Gemma FAILED (non-fatal)"
-    fi
+    if [ "$MODE" = "max2" ]; then
+      # Seed exactly what this mode downloaded — one manifest drives both the
+      # download and the seed-back, so the two can never drift apart.
+      for entry in "${WAN_MANIFEST[@]}"; do
+        IFS='|' read -r rel repo hf_path min <<< "$entry"
+        WAN_R2_SIZE=$(aws s3 ls "s3://${R2_BUCKET}/$rel" \
+          --endpoint-url "$R2_ENDPOINT" 2>/dev/null | awk '{print $3}' || echo 0)
+        if [ "${WAN_R2_SIZE:-0}" -lt "$min" ]; then
+          LOG "R2 upload: seeding $rel..."
+          aws s3 cp "$MODEL_DIR/$rel" "s3://${R2_BUCKET}/$rel" \
+            --endpoint-url "$R2_ENDPOINT" --no-progress \
+            && LOG "R2 upload: $rel done." || LOG "R2 upload: $rel FAILED (non-fatal)"
+        fi
+      done
+    else
+      # Only upload if not already in R2 (check size)
+      LTX_R2_SIZE=$(aws s3 ls "s3://${R2_BUCKET}/checkpoints/$LTX_FILE" \
+        --endpoint-url "$R2_ENDPOINT" 2>/dev/null | awk '{print $3}' || echo 0)
+      if [ "${LTX_R2_SIZE:-0}" -lt $LTX_MIN ]; then
+        LOG "R2 upload: seeding LTX-2.3 checkpoint ($LTX_FILE)..."
+        aws s3 cp "$LTX_CKPT" "s3://${R2_BUCKET}/checkpoints/$LTX_FILE" \
+          --endpoint-url "$R2_ENDPOINT" --no-progress \
+          && LOG "R2 upload: LTX-2.3 done." || LOG "R2 upload: LTX-2.3 FAILED (non-fatal)"
+      fi
+      GEMMA_R2_SIZE=$(aws s3 ls "s3://${R2_BUCKET}/text_encoders/comfy_gemma_3_12B_it.safetensors" \
+        --endpoint-url "$R2_ENDPOINT" 2>/dev/null | awk '{print $3}' || echo 0)
+      if [ "${GEMMA_R2_SIZE:-0}" -lt 8000000000 ]; then
+        LOG "R2 upload: seeding Gemma FP4..."
+        aws s3 cp "$GEMMA" "s3://${R2_BUCKET}/text_encoders/comfy_gemma_3_12B_it.safetensors" \
+          --endpoint-url "$R2_ENDPOINT" --no-progress \
+          && LOG "R2 upload: Gemma done." || LOG "R2 upload: Gemma FAILED (non-fatal)"
+      fi
+    fi  # end per-mode seeding
   ) >> /tmp/r2_seed.log 2>&1 &
   LOG "R2 seed running in background (PID $!)"
 fi
 
 # ── Download worker scripts from control plane ────────────────────────────────
 # The mode query selects the workflow variant (flex → workflow.json graph,
-# max → workflow-max.json: dev ckpt, 24 steps, CFG 3.5, real negative prompt).
+# max → workflow-max.json: dev ckpt, 24 steps, CFG 3.5, real negative prompt,
+# max2 → workflow-wan.json: Wan 2.2 dual-expert graph).
 LOG "Downloading worker scripts..."
 wget -q -O /workspace/worker.py   "${CONTROL_PLANE_URL}/worker/worker.py"
 wget -q -O /workspace/workflow.json "${CONTROL_PLANE_URL}/worker/workflow.json?mode=${MODE}"
@@ -212,11 +307,12 @@ LOG "GPU_COUNT=${GPU_COUNT}"
 
 # ── Start ComfyUI instances (one per GPU) ──────────────────────────────────────
 # --lowvram is for flex only: 46 GB model on a 32 GB RTX 5090 needs layer
-# streaming. Max runs a 42 GB model on a 96 GB RTX PRO 6000 — forcing LOW_VRAM
-# there would stream layers needlessly and multiply render time at the highest
-# $/hr in the fleet.
+# streaming. Max runs a 42 GB model on a 96 GB RTX PRO 6000, and max2 runs two
+# 14 GB fp8 Wan experts SEQUENTIALLY on a 32 GB RTX 5090 — each fits VRAM
+# whole. Forcing LOW_VRAM on either would stream layers needlessly and
+# multiply render time.
 VRAM_FLAG="--lowvram"
-[ "${MODE:-flex}" = "max" ] && VRAM_FLAG=""
+[ "${MODE:-flex}" != "flex" ] && VRAM_FLAG=""
 LOG "Starting ${GPU_COUNT}× ComfyUI (mode=${MODE:-flex}, vram flag='${VRAM_FLAG}')..."
 cd "$COMFY_DIR"
 

@@ -184,6 +184,8 @@ def frames_for_duration(fps: int, duration_secs: int) -> int:
 
 # Must match the file bootstrap-models.sh downloaded for this MODE — the sound
 # path below feeds it to LTXVAudioVAELoader, which reads from disk by filename.
+# Only meaningful for the LTX modes (flex/max); max2 never uses it — its sound
+# request is downgraded to silent in build_workflow.
 LTX_CHECKPOINT = (
     "ltx-2.3-22b-dev.safetensors" if MODE == "max"
     else "ltx-2.3-22b-distilled-1.1.safetensors"
@@ -200,6 +202,14 @@ def build_workflow(job: dict) -> dict:
     seed          = random.randint(0, 2**32 - 1)
     nframes       = frames_for_duration(fps, duration)
     sound_enabled = bool(job.get("sound_enabled", False))
+    if sound_enabled and MODE == "max2":
+        # The AV-latent injection below is LTX-specific: it adds LTXVAudio*
+        # nodes and references the LTX checkpoint, which a max2 (Wan) instance
+        # never downloads. Injecting it into the Wan graph would fail ComfyUI
+        # validation on EVERY job — render silent video instead of poisoning
+        # the whole stream.
+        log("sound_enabled ignored in max2 mode (Wan graph has no audio path)")
+        sound_enabled = False
 
     replacements = {
         "__PROMPT__":     prompt,
@@ -289,7 +299,9 @@ def submit_workflow(workflow: dict) -> str:
 # CFG 3.5 is ~6× the model evals (cond+uncond per step), so a 10 s clip can pass
 # 10 real minutes on an RTX PRO 6000 — a flat 600 s would time out every long max
 # render and (worse) leave it running: see the interrupt logic below.
-RENDER_TIMEOUT_SEC = 2400 if MODE == "max" else 600
+# Max2 needs the same budget: the Wan 2.2 dual-expert graph loads and runs TWO
+# 14B fp8 models sequentially on a 32 GB RTX 5090. Only flex keeps 600 s.
+RENDER_TIMEOUT_SEC = 600 if MODE == "flex" else 2400
 
 
 def interrupt_render() -> None:
@@ -534,7 +546,9 @@ def main() -> None:
                 raise FileNotFoundError("ComfyUI produced no output file")
 
             log(f"Render complete: {video_path}")
-            if MODE == "max":
+            # Film-emulation finish applies to both premium modes — max2 output
+            # targets the same physically-grained showcase look as max.
+            if MODE in ("max", "max2"):
                 video_path = film_finish(video_path)
             r2_key = upload_video(job_id, video_path)
             log(f"Uploaded to {r2_key}")
