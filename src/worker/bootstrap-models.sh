@@ -120,25 +120,8 @@ fetch_model() {
   fi
 
   LOG "Downloading $name..."
-  local ok=false
-  # Measured on live boots (2026-07-23): HF with Xet transfer moved a 42 GB
-  # checkpoint at ~500 MB/s while the APAC R2 bucket managed ~65 MB/s. For the
-  # Wan set (max) HF is therefore the PRIMARY source and R2 the fallback; the
-  # ENAM R2 bucket (US, near our hosts) takes over as primary once populated —
-  # try it first, it is a fast no-op 404 while empty.
-  if [ "$MODE" != "flex" ]; then
-    if r2_available && r2_cp_bucket "video-platform-models-enam" "$rel" "$dest"; then
-      ok=true
-      LOG "$name downloaded from ENAM R2."
-    fi
-  else
-    if r2_available && r2_cp "$rel" "$dest"; then
-      ok=true
-      LOG "$name downloaded from R2."
-    fi
-  fi
-
-  if [ "$ok" = false ]; then
+  local hf_dl
+  hf_dl() {
     python3 -c "
 import os, time, shutil
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
@@ -147,17 +130,34 @@ t0 = time.time()
 path = hf_hub_download('$repo', '$hf_path', local_dir='/tmp/model_dl')
 shutil.move(path, '$dest')
 print(f'[bootstrap] $name done in {(time.time()-t0)/60:.1f}min', flush=True)
-" || true
+" 2>&1
+  }
+  size_ok() { [ "$(stat -c%s "$dest" 2>/dev/null || echo 0)" -ge "$min" ]; }
+
+  if [ "$MODE" != "flex" ]; then
+    # HuggingFace FIRST for the Wan set. Measured live 2026-07-23: HF Xet moves at
+    # ~500 MB/s, while R2 (even the ENAM bucket) delivered ~17 MB/s to the rented
+    # host — a 28 GB expert pair is ~1 min on HF vs ~30 min on R2. The earlier
+    # "ENAM-first" order was a mis-measure and stalled a live 4-GPU boot; R2 is now
+    # strictly the fallback if HF is unavailable.
+    hf_dl || true
+    if ! size_ok && r2_available; then
+      LOG "HF failed for $name — trying ENAM R2..."
+      r2_cp_bucket "video-platform-models-enam" "$rel" "$dest" || true
+    fi
+    if ! size_ok && r2_available; then
+      LOG "ENAM failed for $name — trying APAC R2..."
+      r2_cp "$rel" "$dest" || true
+    fi
+  else
+    # flex (LTX): APAC R2 first (proven fast for this bucket), HF fallback.
+    if ! (r2_available && r2_cp "$rel" "$dest"); then
+      LOG "R2 miss for $name — HuggingFace fallback..."
+      hf_dl || true
+    fi
   fi
 
-  # Last resort for max files: the APAC bucket (slow but ours) — only if HF failed.
-  if [ "$MODE" != "flex" ] && [ "$(stat -c%s "$dest" 2>/dev/null || echo 0)" -lt "$min" ] && r2_available; then
-    LOG "HF failed for $name — trying APAC R2 as last resort..."
-    r2_cp "$rel" "$dest" || true
-  fi
-
-  [ "$(stat -c%s "$dest" 2>/dev/null || echo 0)" -ge "$min" ] || \
-    { LOG "ERROR: $name download incomplete"; exit 1; }
+  size_ok || { LOG "ERROR: $name download incomplete"; exit 1; }
   LOG "$name ready."
 }
 
