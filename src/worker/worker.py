@@ -372,16 +372,15 @@ def film_finish(video_path: str) -> str:
     #   noise        — luma-only temporal grain, subtle (c0s=7)
     #   split+blend  — halation: red-weighted blurred highlights screened back at 25%
     #   crop         — ±3 px sin-drift on non-harmonic frequencies (gate weave)
-    # max2 renders at Wan's native 16 fps — motion-compensated interpolation up
-    # to the product's 24 fps runs FIRST so every later stage (grain, weave)
-    # operates on final-cadence frames. Never interpolate past 24: higher-fps
-    # smoothness is the soap-opera effect, the opposite of the film feel.
-    pre = "minterpolate=fps=24:mi_mode=mci:mc_mode=aobmc:vsbmc=1," if MODE in ("max", "max2") else ""
+    # Max delivers Wan's NATIVE 16 fps. The earlier mci interpolation to 24 fps
+    # warped geometry on complex motion (bent bicycle rim, live batch 1) — a
+    # worse artifact than low frame rate, which simply reads as film cadence.
+    pre = ""
     fc = (
         pre +
         "curves=master='0/0.015 0.25/0.235 0.5/0.5 0.75/0.775 1/0.965',"
         "eq=saturation=0.88,"
-        "noise=c0s=7:c0f=t+u,"
+        "noise=c0s=4:c0f=t+u,"
         # Halation is done in RGB. The first version isolated highlights with a
         # luma-only lut and screen-blended in yuv420p — but blend runs on ALL
         # planes, and screen on the untouched U/V chroma planes floods the whole
@@ -420,6 +419,34 @@ def film_finish(video_path: str) -> str:
     except Exception as e:
         log(f"film_finish error (uploading original): {e}")
         return video_path
+
+
+
+def qc_check(video_path: str) -> str | None:
+    """Cheap defect heuristics on the RAW render (before the film finish).
+
+    Returns a rejection reason, or None if the clip passes. Curation is how
+    frontier showcases look frontier — this is the automated first tier of it:
+    catch the hard failures (dead-black spans, frozen video) that no amount of
+    grading rescues, and give the job one fresh-seed retry instead of shipping
+    a broken clip to the channel.
+    """
+    try:
+        r = subprocess.run(
+            ["ffmpeg", "-i", video_path,
+             "-vf", "blackdetect=d=0.5:pix_th=0.08,freezedetect=n=-50dB:d=1.5",
+             "-an", "-f", "null", "-"],
+            capture_output=True, text=True, timeout=120,
+        )
+        err = r.stderr
+        if "blackdetect" in err and "black_start" in err:
+            return "black span >=0.5s"
+        if "freezedetect" in err and "freeze_start" in err:
+            return "frozen video >=1.5s"
+        return None
+    except Exception as e:
+        log(f"qc_check error (passing clip through): {e}")
+        return None
 
 
 def find_output_video(outputs: dict) -> str | None:
@@ -561,15 +588,26 @@ def main() -> None:
         log(f"Rendering job {job_id} (seq {job.get('sequence_num', '?')})")
 
         try:
-            workflow   = build_workflow(job)
-            prompt_id  = submit_workflow(workflow)
-            log(f"Submitted to ComfyUI as {prompt_id}")
+            # Up to 2 attempts per job: a clip that fails the defect heuristics
+            # gets ONE fresh-seed re-render before we accept whatever came out
+            # (shipping the second attempt regardless keeps the stream moving —
+            # QC must never deadlock a job).
+            video_path = None
+            for qc_attempt in (1, 2):
+                workflow   = build_workflow(job)
+                prompt_id  = submit_workflow(workflow)
+                log(f"Submitted to ComfyUI as {prompt_id} (attempt {qc_attempt})")
 
-            outputs    = wait_for_completion(prompt_id)
-            video_path = find_output_video(outputs)
+                outputs    = wait_for_completion(prompt_id)
+                video_path = find_output_video(outputs)
 
-            if not video_path:
-                raise FileNotFoundError("ComfyUI produced no output file")
+                if not video_path:
+                    raise FileNotFoundError("ComfyUI produced no output file")
+
+                reason = qc_check(video_path) if MODE in ("max", "max2") else None
+                if reason is None:
+                    break
+                log(f"QC reject (attempt {qc_attempt}): {reason} — re-rendering with fresh seed")
 
             log(f"Render complete: {video_path}")
             # Film-emulation finish applies to both premium modes — max2 output
