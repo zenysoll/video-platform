@@ -74,9 +74,6 @@ VAST_EXCLUDED_MACHINES = "36773,79532,53128,58852,40274,105191,94979,106241"   #
 # on 2026-07-21 (docker pull stalled behind a shared-IP Docker Hub rate limit) and
 # served machines 73811 / 91334 / 91308 for the same box.
 VAST_EXCLUDED_HOSTS = "402342"
-# TEMPORARY: pin the old Docker Hub image until the ghcr.io build is pushed and made
-# public, then DELETE this line to fall through to DEFAULT_WORKER_IMAGE (ghcr.io).
-WORKER_IMAGE = "pytorch/pytorch:2.6.0-cuda12.6-cudnn9-runtime"
 
 # ── Secrets (set via `wrangler secret put <NAME>`) ───────────────────────────
 # Never add values here. These names are listed for documentation only:
